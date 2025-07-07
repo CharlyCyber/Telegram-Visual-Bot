@@ -34,24 +34,60 @@ GENRE_EMOJIS = {
     'Superhéroes': '🦸',
 }
 
+# Diccionario de emojis por palabras clave en el título
+KEYWORD_EMOJIS = {
+    'luna': '🌙',
+    'lunar': '🌙',
+    'espacio': '🚀',
+    'estrella': '⭐',
+    'galaxia': '🌌',
+    'mar': '🌊',
+    'océano': '🌊',
+    'amor': '❤️',
+    'nav': '🚀',
+    'avión': '✈️',
+    'ballet': '🩰',
+    'fuego': '🔥',
+    'guerra': '⚔️',
+    'robot': '🤖',
+    'fantasma': '👻',
+    'música': '🎵',
+    'superhéroe': '🦸',
+    'caballo': '🐎',
+    'vaquero': '🤠',
+    'familia': '👨‍👩‍👧‍👦',
+    'misterio': '🕵️',
+    'terror': '👻',
+    'comedia': '😂',
+    'drama': '🎭',
+    'historia': '📜',
+    'fantasía': '🧚',
+    'deporte': '🏅',
+}
+
 def get_genre_emojis(genres):
     emojis = [GENRE_EMOJIS.get(g, '🎬') for g in genres]
-    return ' '.join(emojis)
+    return ' '.join(sorted(set(emojis)))
+
+def get_keyword_emojis(title):
+    title_lower = title.lower()
+    emojis = [emoji for word, emoji in KEYWORD_EMOJIS.items() if word in title_lower]
+    return ' '.join(sorted(set(emojis)))
 
 def get_main_credits(credits, tipo='actor', max_count=3):
     if tipo == 'actor':
         cast = credits.get('cast', [])
-        return ', '.join([c['name'] for c in cast[:max_count]]) if cast else 'No disponible'
+        return ', '.join([c['name'] for c in cast[:max_count]]) if cast else ''
     else:
         crew = credits.get('crew', [])
         for c in crew:
             if c['job'] in ['Director', 'Directora']:
                 return c['name']
-        return 'No disponible'
+        return ''
 
 def get_awards_text():
-    # TMDb no da premios, así que puedes poner "No disponible" o buscar en IMDb si quieres ampliar
-    return 'No disponible'
+    # TMDb no da premios, así que puedes poner "" para omitir si no hay info
+    return ''
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text('Envíame el nombre y año de la película o serie (ejemplo: Inception 2010)')
@@ -96,40 +132,47 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     credits = requests.get(credits_url).json()
 
     # Detalles
-    overview = details.get('overview', 'Sin sinopsis.')
+    overview = details.get('overview', '')
     genres = [g['name'] for g in details.get('genres', [])]
-    genres_str = ', '.join(genres) if genres else 'Sin género'
+    genres_str = ', '.join(genres)
     genre_emojis = get_genre_emojis(genres)
+    keyword_emojis = get_keyword_emojis(title)
     poster_path = details.get('poster_path')
     poster_url = f'https://image.tmdb.org/t/p/original{poster_path}' if poster_path else None
-    release_date = details.get('release_date') or details.get('first_air_date', 'No disponible')
-    runtime = details.get('runtime') or details.get('episode_run_time', ['No disponible'])
+    release_date = details.get('release_date') or details.get('first_air_date', '')
+    runtime = details.get('runtime') or details.get('episode_run_time', [''])
     if isinstance(runtime, list):
-        runtime = runtime[0] if runtime else 'No disponible'
-    if runtime != 'No disponible':
+        runtime = runtime[0] if runtime else ''
+    if runtime:
         runtime = f"{runtime} min"
-    vote_average = details.get('vote_average', 'No disponible')
+    vote_average = details.get('vote_average')
     main_cast = get_main_credits(credits, 'actor', 4)
     director = get_main_credits(credits, 'director')
     awards = get_awards_text()
 
-    # Plantilla motivadora y detallada
-    caption = f"""
-{genre_emojis}🎬 <b>{title} ({year})</b> 🎬{genre_emojis}
-
-📝 <b>Sinopsis:</b>
-{overview}
-
-🎭 <b>Reparto principal:</b> {main_cast}
-🎬 <b>Dirección:</b> {director}
-🕒 <b>Duración:</b> {runtime}
-📅 <b>Estreno:</b> {release_date}
-⭐️ <b>Calificación IMDb:</b> {vote_average}/10
-🏆 <b>Premios:</b> {awards}
-🎞️ <b>Géneros:</b> {genres_str} {genre_emojis}
-
-¡No te pierdas esta emocionante historia! 🚀
-"""
+    # Construir mensaje solo con los campos disponibles
+    lines = []
+    # Título con emojis temáticos
+    title_emojis = f"{keyword_emojis} {genre_emojis}".strip()
+    lines.append(f"{title_emojis}🎬 <b>{title} ({year})</b> 🎬{title_emojis}")
+    if overview:
+        lines.append(f"\n📝 <b>Sinopsis:</b>\n{overview}")
+    if main_cast:
+        lines.append(f"\n🎭 <b>Reparto principal:</b> {main_cast}")
+    if director:
+        lines.append(f"\n🎬 <b>Dirección:</b> {director}")
+    if runtime:
+        lines.append(f"\n🕒 <b>Duración:</b> {runtime}")
+    if release_date:
+        lines.append(f"\n📅 <b>Estreno:</b> {release_date}")
+    if vote_average:
+        lines.append(f"\n⭐️ <b>Calificación IMDb:</b> {vote_average}/10")
+    if awards:
+        lines.append(f"\n🏆 <b>Premios:</b> {awards}")
+    if genres_str:
+        lines.append(f"\n🎞️ <b>Géneros:</b> {genres_str} {genre_emojis}")
+    lines.append("\n¡No te pierdas esta emocionante historia! 🚀")
+    caption = '\n'.join(lines)
 
     if poster_url:
         await context.bot.send_photo(chat_id=CHAT_ID, photo=poster_url, caption=caption, parse_mode='HTML')
