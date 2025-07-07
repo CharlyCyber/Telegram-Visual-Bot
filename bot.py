@@ -8,7 +8,7 @@ CHAT_ID = -1002700094661
 TMDB_API_KEY = '6be7b144ecef91b9d6eaf39946b5273f'
 
 # Diccionario de emojis temáticos por género
-GENRE_EMOJIS = {
+genre_emojis_dict = {
     'Acción': '🔥',
     'Aventura': '🗺️',
     'Animación': '🎨',
@@ -35,7 +35,7 @@ GENRE_EMOJIS = {
 }
 
 # Diccionario de emojis por palabras clave en el título
-KEYWORD_EMOJIS = {
+title_keyword_emojis = {
     'luna': '🌙',
     'lunar': '🌙',
     'espacio': '🚀',
@@ -65,14 +65,109 @@ KEYWORD_EMOJIS = {
     'deporte': '🏅',
 }
 
+# Diccionario de emojis contextuales para la sinopsis
+synopsis_keyword_emojis = {
+    'asesino': '🔪',
+    'asesina': '🔪',
+    'misterio': '🕵️',
+    'amor': '❤️',
+    'guerra': '⚔️',
+    'espacio': '🚀',
+    'luna': '🌙',
+    'planeta': '🪐',
+    'robot': '🤖',
+    'futuro': '🔮',
+    'ballet': '🩰',
+    'baile': '💃',
+    'familia': '👨‍👩‍👧‍👦',
+    'amigos': '🤝',
+    'venganza': '😠',
+    'policía': '👮',
+    'crimen': '🕵️',
+    'viaje': '✈️',
+    'mar': '🌊',
+    'océano': '🌊',
+    'monstruo': '👹',
+    'fantasma': '👻',
+    'música': '🎵',
+    'superhéroe': '🦸',
+    'poder': '💪',
+    'magia': '✨',
+    'rey': '🤴',
+    'reina': '👸',
+    'princesa': '👸',
+    'príncipe': '🤴',
+    'batalla': '⚔️',
+    'fuga': '🏃',
+    'carrera': '🏁',
+    'investigación': '🔍',
+    'secreto': '🤫',
+    'sueño': '💤',
+    'pesadilla': '😱',
+    'dinero': '💰',
+    'poder': '💪',
+    'heroe': '🦸',
+    'villano': '🦹',
+    'extraterrestre': '👽',
+    'alien': '👽',
+    'fuga': '🏃',
+    'rescate': '🆘',
+    'explosión': '💥',
+    'coche': '🚗',
+    'auto': '🚗',
+    'avión': '✈️',
+    'nave': '🚀',
+    'fuego': '🔥',
+    'héroe': '🦸',
+    'enemigo': '😈',
+    'amigo': '🤝',
+    'enemigos': '😈',
+    'peligro': '⚠️',
+    'secuestro': '🕵️',
+    'investigador': '🕵️',
+    'detective': '🕵️',
+    'profesor': '👨‍🏫',
+    'escuela': '🏫',
+    'niño': '🧒',
+    'niña': '👧',
+    'joven': '🧑',
+    'anciano': '🧓',
+    'abuelo': '🧓',
+    'abuela': '👵',
+    'madre': '👩',
+    'padre': '👨',
+    'hermano': '👦',
+    'hermana': '👧',
+    'hijo': '🧒',
+    'hija': '👧',
+}
+
 def get_genre_emojis(genres):
-    emojis = [GENRE_EMOJIS.get(g, '🎬') for g in genres]
+    emojis = [genre_emojis_dict.get(g, '🎬') for g in genres]
     return ' '.join(sorted(set(emojis)))
 
 def get_keyword_emojis(title):
     title_lower = title.lower()
-    emojis = [emoji for word, emoji in KEYWORD_EMOJIS.items() if word in title_lower]
+    emojis = [emoji for word, emoji in title_keyword_emojis.items() if word in title_lower]
     return ' '.join(sorted(set(emojis)))
+
+def get_synopsis_with_emojis(synopsis):
+    if not synopsis:
+        return ''
+    synopsis_lower = synopsis.lower()
+    used_emojis = set()
+    words = synopsis_lower.split()
+    # Solo añadimos hasta 3 emojis contextuales para no sobrecargar
+    for word in words:
+        for key, emoji in synopsis_keyword_emojis.items():
+            if key in word and emoji not in used_emojis:
+                used_emojis.add(emoji)
+                if len(used_emojis) >= 3:
+                    break
+        if len(used_emojis) >= 3:
+            break
+    # Insertamos los emojis al final de la sinopsis
+    return f"{synopsis} {' '.join(used_emojis)}" if used_emojis else synopsis
 
 def get_main_credits(credits, tipo='actor', max_count=3):
     if tipo == 'actor':
@@ -156,7 +251,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     title_emojis = f"{keyword_emojis} {genre_emojis}".strip()
     lines.append(f"{title_emojis}🎬 <b>{title} ({year})</b> 🎬{title_emojis}")
     if overview:
-        lines.append(f"\n📝 <b>Sinopsis:</b>\n{overview}")
+        overview_with_emojis = get_synopsis_with_emojis(overview)
+        lines.append(f"\n📝 <b>Sinopsis:</b>\n{overview_with_emojis}")
     if main_cast:
         lines.append(f"\n🎭 <b>Reparto principal:</b> {main_cast}")
     if director:
@@ -172,6 +268,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if genres_str:
         lines.append(f"\n🎞️ <b>Géneros:</b> {genres_str} {genre_emojis}")
     lines.append("\n¡No te pierdas esta emocionante historia! 🚀")
+    # Firma personalizada
+    lines.append("\n💻ANDY (el+lin2)🛠️🪛 📍Ave 3️⃣7️⃣ - #️⃣4️⃣2️⃣1️⃣1️⃣ ➗4️⃣2️⃣ y 4️⃣8️⃣ cerca del CVD 🏟️ 📌MAYABEQUE SAN JOSÉ")
     caption = '\n'.join(lines)
 
     if poster_url:
