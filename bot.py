@@ -142,6 +142,8 @@ synopsis_keyword_emojis = {
     'hija': '👧',
 }
 
+import random
+
 def get_genre_emojis(genres):
     emojis = [genre_emojis_dict.get(g, '🎬') for g in genres]
     return ' '.join(sorted(set(emojis)))
@@ -183,6 +185,43 @@ def get_main_credits(credits, tipo='actor', max_count=3):
 def get_awards_text():
     # TMDb no da premios, así que puedes poner "" para omitir si no hay info
     return ''
+
+def get_dynamic_closing(synopsis):
+    # Frases base
+    frases = [
+        "¡No te pierdas esta emocionante historia! 🚀",
+        "¡Atrévete a descubrir el misterio! 🕵️‍♂️",
+        "¡Sumérgete en esta aventura única! 🗺️",
+        "¡Prepárate para la acción! 🔥",
+        "¡Déjate sorprender por esta trama! 😱",
+        "¡Vive la emoción hasta el final! 🎬",
+        "¡Una experiencia que no olvidarás! ⭐",
+        "¡Descubre el destino de los protagonistas! 🎭",
+        "¡No te quedes sin verla! 👀",
+        "¡Una historia que te atrapará! 🌀",
+    ]
+    # Palabras clave para personalizar
+    s = synopsis.lower()
+    if any(word in s for word in ['misterio', 'secreto', 'investigación', 'detective']):
+        return "¡Atrévete a descubrir el misterio! 🕵️‍♂️"
+    if any(word in s for word in ['aventura', 'viaje', 'exploración', 'expedición']):
+        return "¡Sumérgete en esta aventura única! 🗺️"
+    if any(word in s for word in ['acción', 'batalla', 'lucha', 'combate', 'guerra']):
+        return "¡Prepárate para la acción! 🔥"
+    if any(word in s for word in ['amor', 'romance', 'pareja', 'sentimiento']):
+        return "¡Déjate llevar por esta historia de amor! ❤️"
+    if any(word in s for word in ['familia', 'hermano', 'hermana', 'padre', 'madre', 'hijo', 'hija']):
+        return "¡Una historia que celebra la familia! 👨‍👩‍👧‍👦"
+    if any(word in s for word in ['espacio', 'planeta', 'galaxia', 'universo', 'luna']):
+        return "¡Viaja más allá de las estrellas! 🌌"
+    if any(word in s for word in ['terror', 'miedo', 'pesadilla', 'oscuro', 'fantasma', 'monstruo']):
+        return "¡Atrévete a sentir el terror! 👻"
+    if any(word in s for word in ['música', 'canción', 'banda', 'concierto']):
+        return "¡Déjate llevar por la música! 🎵"
+    if any(word in s for word in ['magia', 'hechizo', 'encantamiento', 'fantasía']):
+        return "¡Descubre un mundo de magia y fantasía! ✨"
+    # Si no hay coincidencia, elige una frase aleatoria
+    return random.choice(frases)
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text('Envíame el nombre y año de la película o serie (ejemplo: Inception 2010)')
@@ -270,7 +309,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         lines.append(f"\n🏆 <b>Premios:</b> {awards}")
     if genres_str:
         lines.append(f"\n🎞️ <b>Géneros:</b> {genres_str} {genre_emojis}")
-    lines.append("\n¡No te pierdas esta emocionante historia! 🚀")
+    # Frase de cierre dinámica
+    lines.append(f"\n{get_dynamic_closing(overview)}")
     # Firma personalizada
     lines.append("\n💻ANDY (el+lin2)🛠️🪛 📍Ave 3️⃣7️⃣ - #️⃣4️⃣2️⃣1️⃣1️⃣ ➗4️⃣2️⃣ y 4️⃣8️⃣ cerca del CVD 🏟️ 📌MAYABEQUE SAN JOSÉ")
     caption = '\n'.join(lines)
