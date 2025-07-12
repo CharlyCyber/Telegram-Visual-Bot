@@ -1,3 +1,4 @@
+```python
 import os
 import requests
 from telegram import Update
@@ -250,6 +251,9 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Título con emojis temáticos
     title_emojis = f"{keyword_emojis} {genre_emojis}".strip()
     lines.append(f"{title_emojis}🎬 <b>{title} ({year})</b> 🎬{title_emojis}")
+    # Tipo de material
+    tipo_material = '🎬 Tipo: Película' if is_movie else '📺 Tipo: Serie'
+    lines.append(f"\n{tipo_material}")
     if overview:
         overview_with_emojis = get_synopsis_with_emojis(overview)
         lines.append(f"\n📝 <b>Sinopsis:</b>\n{overview_with_emojis}")
@@ -282,3 +286,4 @@ if __name__ == '__main__':
     app.add_handler(CommandHandler('start', start))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     app.run_polling()
+```
