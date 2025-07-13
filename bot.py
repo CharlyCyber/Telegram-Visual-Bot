@@ -139,7 +139,6 @@ synopsis_keyword_emojis = {
     'hijo': '🧒',
     'hija': '👧',
 }
-
 def get_genre_emojis(genres):
     emojis = [genre_emojis_dict.get(g, '🎬') for g in genres]
     return ' '.join(sorted(set(emojis)))
@@ -212,7 +211,8 @@ def get_dynamic_closing(synopsis):
     if any(word in s for word in ['magia', 'hechizo', 'encantamiento', 'fantasía']):
         return "¡Descubre un mundo de magia y fantasía! ✨"
     return random.choice(frases)
-# --- Búsqueda en TVmaze ---
+
+# Búsqueda en TVmaze
 def search_tvmaze(query):
     url = f'https://api.tvmaze.com/search/shows?q={query}'
     r = requests.get(url)
@@ -262,7 +262,7 @@ def search_tvmaze(query):
     caption = '\n'.join(lines)
     return poster_url, caption
 
-# --- Búsqueda en OMDb ---
+# Búsqueda en OMDb
 def search_omdb(title, year):
     url = f'http://www.omdbapi.com/?t={title}&y={year}&apikey={OMDB_API_KEY}&plot=full&lang=es'
     r = requests.get(url)
@@ -310,143 +310,69 @@ def search_omdb(title, year):
     lines.append("\n💻ANDY (el+lin2)🛠️🪛 📍Ave 3️⃣7️⃣ - #️⃣4️⃣2️⃣1️⃣1️⃣ ➗4️⃣2️⃣ y 4️⃣8️⃣ cerca del CVD 🏟️ 📌MAYABEQUE SAN JOSÉ")
     caption = '\n'.join(lines)
     return poster_url, caption
-
-# --- Flujo interactivo y lógica principal ---
 SELECTING, = range(1)
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip()
-    try:
-        name, year = text.rsplit(' ', 1)
-    except ValueError:
-        await update.message.reply_text('Por favor, envía el nombre y el año. Ejemplo: Inception 2010')
-        return
-
-    # Buscar en TMDb (películas)
-    url = f'https://api.themoviedb.org/3/search/movie?api_key={TMDB_API_KEY}&query={name}&year={year}&language=es-ES'
-    r = requests.get(url)
-    data = r.json()
-    is_movie = True
-
-    if not data['results']:
-        # Buscar en TMDb (series)
-        url = f'https://api.themoviedb.org/3/search/tv?api_key={TMDB_API_KEY}&query={name}&first_air_date_year={year}&language=es-ES'
-        r = requests.get(url)
-        data = r.json()
-        is_movie = False
-        if not data['results']:
-            # Buscar en TVmaze
-            poster_url, caption = search_tvmaze(name)
+    # Buscar en TMDb (películas y series) solo por nombre
+    url_movie = f'https://api.themoviedb.org/3/search/movie?api_key={TMDB_API_KEY}&query={text}&language=es-ES'
+    url_tv = f'https://api.themoviedb.org/3/search/tv?api_key={TMDB_API_KEY}&query={text}&language=es-ES'
+    r_movie = requests.get(url_movie)
+    r_tv = requests.get(url_tv)
+    data_movie = r_movie.json()
+    data_tv = r_tv.json()
+    results = []
+    for item in data_movie.get('results', []):
+        item['is_movie'] = True
+        results.append(item)
+    for item in data_tv.get('results', []):
+        item['is_movie'] = False
+        results.append(item)
+    if not results:
+        # Buscar en TVmaze
+        poster_url, caption = search_tvmaze(text)
+        if not caption:
+            # Buscar en OMDb
+            poster_url, caption = search_omdb(text, '')
             if not caption:
-                # Buscar en OMDb
-                poster_url, caption = search_omdb(name, year)
-                if not caption:
-                    await update.message.reply_text('No se encontró el material. Intenta con otro nombre o año.')
-                    return
-            if poster_url:
-                await context.bot.send_photo(chat_id=CHAT_ID, photo=poster_url, caption=caption, parse_mode='HTML')
-            else:
-                await context.bot.send_message(chat_id=CHAT_ID, text=caption, parse_mode='HTML')
-            return
-
+                await update.message.reply_text('No se encontró el material. Intenta con otro nombre.')
+                return
+        if poster_url:
+            await context.bot.send_photo(chat_id=CHAT_ID, photo=poster_url, caption=caption, parse_mode='HTML')
+        else:
+            await context.bot.send_message(chat_id=CHAT_ID, text=caption, parse_mode='HTML')
+        return
     # Si hay más de una coincidencia, mostrar opciones
-    if len(data['results']) > 1:
-        context.user_data['options'] = data['results']
-        context.user_data['is_movie'] = is_movie
+    if len(results) > 1:
+        context.user_data['options'] = results
         msg = 'Se encontraron varias coincidencias. Responde con el número de la opción que deseas publicar:\n\n'
-        for idx, item in enumerate(data['results'], 1):
-            if is_movie:
-                title = item.get('title', 'Sin título')
-                date = item.get('release_date', '')
-            else:
-                title = item.get('name', 'Sin título')
-                date = item.get('first_air_date', '')
-            msg += f"{idx}. {title} ({date[:4]})\n"
+        for idx, item in enumerate(results, 1):
+            title = item.get('title') or item.get('name', 'Sin título')
+            date = item.get('release_date') or item.get('first_air_date', '')
+            tipo = 'Película' if item['is_movie'] else 'Serie'
+            msg += f"{idx}. {title} ({date[:4] if date else 'N/D'}) [{tipo}]\n"
         await update.message.reply_text(msg)
         return SELECTING
-
     # Si solo hay una coincidencia, publicar directamente
-    await publish_tmdb_item(update, context, data['results'][0], is_movie, year)
+    await publish_tmdb_item(update, context, results[0], results[0]['is_movie'])
 
 async def select_option(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         idx = int(update.message.text.strip()) - 1
         options = context.user_data.get('options', [])
-        is_movie = context.user_data.get('is_movie', True)
         if idx < 0 or idx >= len(options):
             await update.message.reply_text('Opción inválida. Intenta de nuevo.')
             return SELECTING
         item = options[idx]
-        year = item.get('release_date', '')[:4] if is_movie else item.get('first_air_date', '')[:4]
-        await publish_tmdb_item(update, context, item, is_movie, year)
+        await publish_tmdb_item(update, context, item, item['is_movie'])
         context.user_data.clear()
         return ConversationHandler.END
     except Exception:
         await update.message.reply_text('Por favor, responde con el número de la opción.')
         return SELECTING
 
-async def publish_tmdb_item(update, context, item, is_movie, year):
-    if is_movie:
-        title = item.get('title', 'Sin título')
-        id_ = item['id']
-        details_url = f'https://api.themoviedb.org/3/movie/{id_}?api_key={TMDB_API_KEY}&language=es-ES'
-        credits_url = f'https://api.themoviedb.org/3/movie/{id_}/credits?api_key={TMDB_API_KEY}&language=es-ES'
-    else:
-        title = item.get('name', 'Sin título')
-        id_ = item['id']
-        details_url = f'https://api.themoviedb.org/3/tv/{id_}?api_key={TMDB_API_KEY}&language=es-ES'
-        credits_url = f'https://api.themoviedb.org/3/tv/{id_}/credits?api_key={TMDB_API_KEY}&language=es-ES'
-    details = requests.get(details_url).json()
-    credits = requests.get(credits_url).json()
-    overview = details.get('overview', '')
-    genres = [g['name'] for g in details.get('genres', [])]
-    genres_str = ', '.join(genres)
-    genre_emojis = get_genre_emojis(genres)
-    keyword_emojis = get_keyword_emojis(title)
-    poster_path = details.get('poster_path')
-    poster_url = f'https://image.tmdb.org/t/p/original{poster_path}' if poster_path else None
-    release_date = details.get('release_date') or details.get('first_air_date', '')
-    runtime = details.get('runtime') or details.get('episode_run_time', [''])
-    if isinstance(runtime, list):
-        runtime = runtime[0] if runtime else ''
-    if runtime:
-        runtime = f"{runtime} min"
-    vote_average = details.get('vote_average')
-    main_cast = get_main_credits(credits, 'actor', 4)
-    director = get_main_credits(credits, 'director')
-    awards = get_awards_text()
-    lines = []
-    title_emojis = f"{keyword_emojis} {genre_emojis}".strip()
-    lines.append(f"{title_emojis}🎬 <b>{title} ({year})</b> 🎬{title_emojis}")
-    tipo_material = '🎬 Tipo: Película' if is_movie else '📺 Tipo: Serie'
-    lines.append(f"\n{tipo_material}")
-    if overview:
-        overview_with_emojis = get_synopsis_with_emojis(overview)
-        lines.append(f"\n📝 <b>Sinopsis:</b>\n{overview_with_emojis}")
-    if main_cast:
-        lines.append(f"\n🎭 <b>Reparto principal:</b> {main_cast}")
-    if director:
-        lines.append(f"\n🎬 <b>Dirección:</b> {director}")
-    if runtime:
-        lines.append(f"\n🕒 <b>Duración:</b> {runtime}")
-    if release_date:
-        lines.append(f"\n📅 <b>Estreno:</b> {release_date}")
-    if vote_average:
-        lines.append(f"\n⭐️ <b>Calificación IMDb:</b> {vote_average}/10")
-    if awards:
-        lines.append(f"\n🏆 <b>Premios:</b> {awards}")
-    if genres_str:
-        lines.append(f"\n🎞️ <b>Géneros:</b> {genres_str} {genre_emojis}")
-    lines.append(f"\n{get_dynamic_closing(overview)}")
-    lines.append("\n💻ANDY (el+lin2)🛠️🪛 📍Ave 3️⃣7️⃣ - #️⃣4️⃣2️⃣1️⃣1️⃣ ➗4️⃣2️⃣ y 4️⃣8️⃣ cerca del CVD 🏟️ 📌MAYABEQUE SAN JOSÉ")
-    caption = '\n'.join(lines)
-    if poster_url:
-        await context.bot.send_photo(chat_id=CHAT_ID, photo=poster_url, caption=caption, parse_mode='HTML')
-    else:
-        await context.bot.send_message(chat_id=CHAT_ID, text=caption, parse_mode='HTML')
-
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text('Envíame el nombre y año de la película o serie (ejemplo: Inception 2010)')
+    await update.message.reply_text('Envíame el nombre de la película o serie (ejemplo: Inception)')
 
 if __name__ == '__main__':
     app = ApplicationBuilder().token(BOT_TOKEN).build()
@@ -460,4 +386,3 @@ if __name__ == '__main__':
     app.add_handler(CommandHandler('start', start))
     app.add_handler(conv_handler)
     app.run_polling()
-
