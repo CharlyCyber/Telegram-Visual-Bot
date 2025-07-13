@@ -181,7 +181,9 @@ async def search_tmdb_and_show_options(update: Update, context: ContextTypes.DEF
                 client.get(url_tv, timeout=10)
             )
             data_movie = r_movie.json()
+            print('TMDb movie:', data_movie)
             data_tv = r_tv.json()
+            print('TMDb tv:', data_tv)
         
         results = []
         for item in data_movie.get('results', []):
