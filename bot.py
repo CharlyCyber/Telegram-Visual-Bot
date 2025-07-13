@@ -315,7 +315,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return ConversationHandler.END
 
     except Exception as e:
-        logger.error(f"Error en handle_message: {e}")
+        print(f"Error en handle_message: {e}")
+        print(e)
         await update.message.reply_text("Hubo un error al procesar tu búsqueda. Intenta de nuevo.")
         return ConversationHandler.END
 
