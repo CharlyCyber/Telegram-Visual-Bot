@@ -273,35 +273,32 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         text = update.message.text.strip()
-        
-        # Primero buscar en TMDb
         found = await search_tmdb_and_show_options(update, context, text)
-        
+        if found and update.effective_user.id in user_matches:
+            # Hay varias coincidencias, cambiamos al estado SELECTING
+            return SELECTING
         if not found:
             # Si no hay resultados en TMDb, buscar en TVmaze
             poster, caption = search_tvmaze(text)
             if poster and caption:
                 await update.message.reply_photo(photo=poster, caption=caption, parse_mode='HTML')
                 return
-            elif caption:  # Si hay caption pero no poster
+            elif caption:
                 await update.message.reply_text(caption, parse_mode='HTML')
                 return
-                
             # Si no hay resultados en TVmaze, buscar en OMDb
             poster, caption = search_omdb(text)
             if poster and caption:
                 await update.message.reply_photo(photo=poster, caption=caption, parse_mode='HTML')
                 return
-            elif caption:  # Si hay caption pero no poster
+            elif caption:
                 await update.message.reply_text(caption, parse_mode='HTML')
                 return
-                
-            # Si no encuentra nada en ninguna API
             await update.message.reply_text("No encontré nada con ese nombre 😢\nIntenta con otro título o verifica la ortografía.")
-            
     except Exception as e:
         print(f"Error en handle_message: {e}")
         await update.message.reply_text("Hubo un error al procesar tu búsqueda. Intenta de nuevo.")
+
 
 async def select_option(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
