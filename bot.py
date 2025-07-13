@@ -354,13 +354,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 if __name__ == '__main__':
     app = ApplicationBuilder().token(BOT_TOKEN).build()
-    conv_handler = ConversationHandler(
-        entry_points=[MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message)],
-        states={
-            SELECTING: [MessageHandler(filters.TEXT & ~filters.COMMAND, select_option)]
-        },
-        fallbacks=[]
-    )
-    app.add_handler(CommandHandler('start', start))
-    app.add_handler(conv_handler)
+    conv_handler = ConversationHandler( entry_points=[CommandHandler('start', start), MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message)], states={ SELECTING: [MessageHandler(filters.Regex(r'^\d+$'), select_option)], }, fallbacks=[CommandHandler('start', start)] )
+
+app.add_handler(conv_handler)
     app.run_polling()
