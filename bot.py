@@ -3,8 +3,12 @@ import asyncio
 import httpx
 import random
 import logging
+from dotenv import load_dotenv
 from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes, MessageHandler, filters, ConversationHandler
+
+# Cargar variables de entorno
+load_dotenv()
 
 # --- Configuración y Constantes ---
 logging.basicConfig(
