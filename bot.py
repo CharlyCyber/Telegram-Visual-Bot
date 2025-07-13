@@ -311,15 +311,7 @@ async def select_option(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if idx < 0 or idx >= len(options):
             await update.message.reply_text('Opción inválida. Intenta de nuevo.')
             return SELECTING
-        item = options[idx]
-        await publish_tmdb_item(update, context, item, item['is_movie'])
-        del user_matches[user_id]
-        return ConversationHandler.END
-    except Exception:
-        await update.message.reply_text('Por favor, responde con el número de la opción.')
-        return SELECTING
-
-            
+        
         item = options[idx]
         await publish_tmdb_item(update, context, item, item['is_movie'])
         del user_matches[user_id]
@@ -338,14 +330,19 @@ if __name__ == '__main__':
         app = ApplicationBuilder().token(BOT_TOKEN).build()
         
         conv_handler = ConversationHandler(
-    entry_points=[
-        CommandHandler('start', start),
-        MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message)
-    ],
-    states={
-        SELECTING: [MessageHandler(filters.Regex(r'^\d+$'), select_option)]
-    },
-    fallbacks=[CommandHandler('start', start)]
-)
+            entry_points=[
+                CommandHandler('start', start),
+                MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message)
+            ],
+            states={
+                SELECTING: [MessageHandler(filters.Regex(r'^\d+$'), select_option)]
+            },
+            fallbacks=[CommandHandler('start', start)]
+        )
 
-app.add_handler(conv_handler)
+        app.add_handler(conv_handler)
+        
+        print("Bot iniciado...")
+        app.run_polling()
+    except Exception as e:
+        print(f"Error al iniciar el bot: {e}")
