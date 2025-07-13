@@ -312,47 +312,25 @@ def search_omdb(title, year):
     return poster_url, caption
 SELECTING, = range(1)
 
-async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    text = update.message.text.strip()
-    # Buscar en TMDb (películas y series) solo por nombre
-    url_movie = f'https://api.themoviedb.org/3/search/movie?api_key={TMDB_API_KEY}&query={text}&language=es-ES'
-    url_tv = f'https://api.themoviedb.org/3/search/tv?api_key={TMDB_API_KEY}&query={text}&language=es-ES'
-    r_movie = requests.get(url_movie)
-    r_tv = requests.get(url_tv)
-    data_movie = r_movie.json()
-    data_tv = r_tv.json()
-    results = []
-    for item in data_movie.get('results', []):
-        item['is_movie'] = True
-        results.append(item)
-    for item in data_tv.get('results', []):
-        item['is_movie'] = False
-        results.append(item)
-    if not results:
-        # Buscar en TVmaze
-        poster_url, caption = search_tvmaze(text)
-        if not caption:
-            # Buscar en OMDb
-            poster_url, caption = search_omdb(text, '')
-            if not caption:
-                await update.message.reply_text('No se encontró el material. Intenta con otro nombre.')
-                return
-        if poster_url:
-            await context.bot.send_photo(chat_id=CHAT_ID, photo=poster_url, caption=caption, parse_mode='HTML')
-        else:
-            await context.bot.send_message(chat_id=CHAT_ID, text=caption, parse_mode='HTML')
-        return
-    # Si hay más de una coincidencia, mostrar opciones
-    if len(results) > 1:
-        context.user_data['options'] = results
-        msg = 'Se encontraron varias coincidencias. Responde con el número de la opción que deseas publicar:\n\n'
-        for idx, item in enumerate(results, 1):
-            title = item.get('title') or item.get('name', 'Sin título')
-            date = item.get('release_date') or item.get('first_air_date', '')
-            tipo = 'Película' if item['is_movie'] else 'Serie'
-            msg += f"{idx}. {title} ({date[:4] if date else 'N/D'}) [{tipo}]\n"
-        await update.message.reply_text(msg)
+async def select_option(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    options = context.user_data.get('options')
+    if not options:
+        # No hay opciones guardadas, vuelve a buscar por nombre
+        await handle_message(update, context)
+        return ConversationHandler.END
+    try:
+        idx = int(update.message.text.strip()) - 1
+        if idx < 0 or idx >= len(options):
+            await update.message.reply_text('Opción inválida. Intenta de nuevo.')
+            return SELECTING
+        item = options[idx]
+        await publish_tmdb_item(update, context, item, item['is_movie'])
+        context.user_data.clear()
+        return ConversationHandler.END
+    except Exception:
+        await update.message.reply_text('Por favor, responde con el número de la opción.')
         return SELECTING
+
     # Si solo hay una coincidencia, publicar directamente
     await publish_tmdb_item(update, context, results[0], results[0]['is_movie'])
 
