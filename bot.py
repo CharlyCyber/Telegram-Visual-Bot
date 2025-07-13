@@ -345,9 +345,7 @@ if __name__ == '__main__':
         CommandHandler('start', start),
         MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message)
     ],
-    states={
-        SELECTING: [
-            MessageHandler(filters.Regex(r'^\d+$'), select_option),
+    states={ SELECTING: [MessageHandler(filters.Regex(r'^\d+$'), select_option)] },
             MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message)
         ]
     },
