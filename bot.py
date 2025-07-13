@@ -1,14 +1,29 @@
 import os
-import requests
+import httpx
 import random
+import logging
 from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes, MessageHandler, filters, ConversationHandler
 
-BOT_TOKEN = os.getenv("BOT_TOKEN", "7726628351:AAGtS54WxgnTPDw1xvwREn-gFsl1WC9Eg9Q")
-TMDB_API_KEY = os.getenv("TMDB_API_KEY", "6be7b144ecef91b9d6eaf39946b5273f")
+# --- Configuración y Constantes ---
+logging.basicConfig(
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    level=logging.INFO
+)
+logger = logging.getLogger(__name__)
+
+BOT_TOKEN = os.getenv("BOT_TOKEN")
+TMDB_API_KEY = os.getenv("TMDB_API_KEY")
+OMDB_API_KEY = os.getenv("OMDB_API_KEY") # Movido aquí para consistencia
 CHAT_ID = -1002700094661
 
-# Diccionarios de emojis
+SIGNATURE = "\n\n💻ANDY (el+lin2)🛠️🪛 📍Ave 3️⃣7️⃣ - #️⃣4️⃣2️⃣1️⃣1️⃣ ➗4️⃣2️⃣ y 4️⃣8️⃣ cerca del CVD 🏟️ 📌MAYABEQUE SAN JOSÉ"
+
+# Estados de la conversación
+SELECTING = 1
+
+# --- Diccionarios de Emojis ---
+
 genre_emojis_dict = {
     'Acción': '🔥', 'Aventura': '🗺️', 'Animación': '🎨', 'Comedia': '😂',
     'Crimen': '🕵️', 'Documental': '🎥', 'Drama': '🎭', 'Familia': '👨‍👩‍👧‍👦',
@@ -35,6 +50,8 @@ synopsis_keyword_emojis = {
     'dinero': '💰', 'rescate': '🆘', 'explosión': '💥', 'coche': '🚗',
 }
 
+# --- Funciones de Formato de Texto ---
+
 def get_genre_emojis(genres):
     return ' '.join(sorted({genre_emojis_dict.get(g, '🎬') for g in genres}))
 
@@ -45,16 +62,14 @@ def get_keyword_emojis(title):
 def get_synopsis_with_emojis(synopsis):
     if not synopsis:
         return ''
-    used = set()
-    for w in synopsis.lower().split():
-        for k, e in synopsis_keyword_emojis.items():
-            if k in w and e not in used:
-                used.add(e)
-                if len(used) == 3:
-                    break
-        if len(used) == 3:
-            break
-    return f"{synopsis} {' '.join(used)}" if used else synopsis
+    synopsis_lower = synopsis.lower()
+    found_emojis = set()
+    for keyword, emoji in synopsis_keyword_emojis.items():
+        if keyword in synopsis_lower and emoji not in found_emojis:
+            found_emojis.add(emoji)
+            if len(found_emojis) >= 3:
+                break
+    return f"{synopsis} {' '.join(found_emojis)}" if found_emojis else synopsis
 
 def get_dynamic_closing(synopsis):
     s = synopsis.lower()
@@ -72,14 +87,17 @@ def get_dynamic_closing(synopsis):
         "¡Una experiencia que no olvidarás! ⭐"
     ])
 
-# Funciones de búsqueda alternativas
-def search_tvmaze(query):
+# --- Funciones de Búsqueda en APIs (Refactorizadas a async) ---
+
+async def search_tvmaze(query: str):
     """Buscar en TVmaze API"""
     try:
-        url = f"https://api.tvmaze.com/search/shows?q={query}"
-        response = requests.get(url, timeout=10)
-        data = response.json()
-        
+        async with httpx.AsyncClient() as client:
+            url = f"https://api.tvmaze.com/search/shows?q={query}"
+            response = await client.get(url, timeout=10)
+            response.raise_for_status()
+            data = response.json()
+
         if not data:
             return None, None
             
@@ -101,77 +119,68 @@ def search_tvmaze(query):
         if premiered:
             caption += f"📅 <b>Estreno:</b> {premiered}\n"
         
-        caption += f"\n{get_dynamic_closing(summary)}"
-        caption += "\n\n💻ANDY (el+lin2)🛠️🪛 📍Ave 3️⃣7️⃣ - #️⃣4️⃣2️⃣1️⃣1️⃣ ➗4️⃣2️⃣ y 4️⃣8️⃣ cerca del CVD 🏟️ 📌MAYABEQUE SAN JOSÉ"
+        caption += f"\n{get_dynamic_closing(summary)}{SIGNATURE}"
         
         return image_url, caption
         
     except Exception as e:
-        print(f"Error en TVmaze: {e}")
+        logger.error(f"Error en TVmaze: {e}")
         return None, None
 
-def search_omdb(query):
+async def search_omdb(query: str):
     """Buscar en OMDb API (necesita API key)"""
+    if not OMDB_API_KEY:
+        logger.warning("OMDB_API_KEY no está configurada.")
+        return None, None
     try:
-        # Nota: Necesitas registrarte en omdbapi.com para obtener una API key gratuita
-        OMDB_API_KEY = os.getenv("OMDB_API_KEY", "")
-        if not OMDB_API_KEY:
-            return None, None
-            
-        url = f"http://www.omdbapi.com/?t={query}&apikey={OMDB_API_KEY}"
-        response = requests.get(url, timeout=10)
-        data = response.json()
-        
+        async with httpx.AsyncClient() as client:
+            url = f"https://www.omdbapi.com/?t={query}&apikey={OMDB_API_KEY}"
+            response = await client.get(url, timeout=10)
+            response.raise_for_status()
+            data = response.json()
+
         if data.get('Response') == 'False':
             return None, None
             
         title = data.get('Title', 'Sin título')
         year = data.get('Year', 'N/D')
         plot = data.get('Plot', '')
-        poster = data.get('Poster', '')
+        poster_url = data.get('Poster') if data.get('Poster') != 'N/A' else None
         rating = data.get('imdbRating', 'N/D')
         genre = data.get('Genre', '')
         runtime = data.get('Runtime', '')
         director = data.get('Director', '')
         actors = data.get('Actors', '')
         
-        caption = f"🎬 <b>{title} ({year})</b>\n\n"
-        if plot and plot != 'N/A':
-            caption += f"📝 <b>Sinopsis:</b>\n{get_synopsis_with_emojis(plot)}\n\n"
-        if director and director != 'N/A':
-            caption += f"🎬 <b>Director:</b> {director}\n"
-        if actors and actors != 'N/A':
-            caption += f"🎭 <b>Reparto:</b> {actors}\n"
-        if runtime and runtime != 'N/A':
-            caption += f"🕒 <b>Duración:</b> {runtime}\n"
-        if genre and genre != 'N/A':
-            caption += f"🎞️ <b>Géneros:</b> {genre}\n"
-        if rating and rating != 'N/A':
-            caption += f"⭐️ <b>Calificación IMDb:</b> {rating}/10\n"
+        caption_parts = [f"🎬 <b>{title} ({year})</b>"]
+        if plot and plot != 'N/A':       caption_parts.append(f"\n📝 <b>Sinopsis:</b>\n{get_synopsis_with_emojis(plot)}")
+        if director and director != 'N/A': caption_parts.append(f"\n🎬 <b>Director:</b> {director}")
+        if actors and actors != 'N/A':   caption_parts.append(f"\n🎭 <b>Reparto:</b> {actors}")
+        if runtime and runtime != 'N/A': caption_parts.append(f"\n🕒 <b>Duración:</b> {runtime}")
+        if genre and genre != 'N/A':     caption_parts.append(f"\n🎞️ <b>Géneros:</b> {genre}")
+        if rating and rating != 'N/A':   caption_parts.append(f"\n⭐️ <b>Calificación IMDb:</b> {rating}/10")
         
-        caption += f"\n{get_dynamic_closing(plot)}"
-        caption += "\n\n💻ANDY (el+lin2)🛠️🪛 📍Ave 3️⃣7️⃣ - #️⃣4️⃣2️⃣1️⃣1️⃣ ➗4️⃣2️⃣ y 4️⃣8️⃣ cerca del CVD 🏟️ 📌MAYABEQUE SAN JOSÉ"
+        caption_parts.append(f"\n{get_dynamic_closing(plot)}{SIGNATURE}")
+        caption = '\n'.join(caption_parts)
         
-        poster_url = poster if poster and poster != 'N/A' else None
         return poster_url, caption
         
     except Exception as e:
-        print(f"Error en OMDb: {e}")
+        logger.error(f"Error en OMDb: {e}")
         return None, None
-
-# Búsqueda en TMDb y lógica de coincidencias
-user_matches = {}
 
 async def search_tmdb_and_show_options(update: Update, context: ContextTypes.DEFAULT_TYPE, query: str):
     try:
-        url_movie = f'https://api.themoviedb.org/3/search/movie?api_key={TMDB_API_KEY}&query={query}&language=es-ES'
-        url_tv = f'https://api.themoviedb.org/3/search/tv?api_key={TMDB_API_KEY}&query={query}&language=es-ES'
-        
-        r_movie = requests.get(url_movie, timeout=10)
-        r_tv = requests.get(url_tv, timeout=10)
-        
-        data_movie = r_movie.json()
-        data_tv = r_tv.json()
+        async with httpx.AsyncClient() as client:
+            url_movie = f'https://api.themoviedb.org/3/search/movie?api_key={TMDB_API_KEY}&query={query}&language=es-ES'
+            url_tv = f'https://api.themoviedb.org/3/search/tv?api_key={TMDB_API_KEY}&query={query}&language=es-ES'
+            
+            r_movie, r_tv = await asyncio.gather(
+                client.get(url_movie, timeout=10),
+                client.get(url_tv, timeout=10)
+            )
+            data_movie = r_movie.json()
+            data_tv = r_tv.json()
         
         results = []
         for item in data_movie.get('results', []):
@@ -185,11 +194,11 @@ async def search_tmdb_and_show_options(update: Update, context: ContextTypes.DEF
             return False
             
         if len(results) == 1:
-            await publish_tmdb_item(update, context, results[0], results[0]['is_movie'])
+            await publish_tmdb_item(update, results[0])
             return True
             
         # Mostrar opciones
-        user_matches[update.effective_user.id] = results
+        context.user_data['matches'] = results
         msg = 'Se encontraron varias coincidencias. Responde con el número de la opción que deseas publicar:\n\n'
         for idx, item in enumerate(results, 1):
             title = item.get('title') or item.get('name', 'Sin título')
@@ -199,11 +208,12 @@ async def search_tmdb_and_show_options(update: Update, context: ContextTypes.DEF
         await update.message.reply_text(msg)
         return True
         
-    except Exception as e:
-        print(f"Error en TMDb: {e}")
+    except httpx.RequestError as e:
+        logger.error(f"Error de red en TMDb: {e}")
         return False
 
-async def publish_tmdb_item(update, context, item, is_movie):
+async def publish_tmdb_item(update: Update, item: dict):
+    is_movie = item.get('is_movie', False)
     try:
         if is_movie:
             title = item.get('title', 'Sin título')
@@ -213,8 +223,10 @@ async def publish_tmdb_item(update, context, item, is_movie):
             title = item.get('name', 'Sin título')
             id_ = item['id']
             details_url = f'https://api.themoviedb.org/3/tv/{id_}?api_key={TMDB_API_KEY}&language=es-ES&append_to_response=credits'
-            
-        details = requests.get(details_url, timeout=10).json()
+        
+        async with httpx.AsyncClient() as client:
+            response = await client.get(details_url, timeout=10)
+            details = response.json()
         
         overview = details.get('overview', '')
         genres = [g['name'] for g in details.get('genres', [])]
@@ -251,98 +263,115 @@ async def publish_tmdb_item(update, context, item, is_movie):
         if vote_average: lines.append(f"\n⭐️ <b>Calificación IMDb:</b> {vote_average}/10")
         if genres:     lines.append(f"\n🎞️ <b>Géneros:</b> {', '.join(genres)} {genre_emojis}")
         
-        lines.append(f"\n{get_dynamic_closing(overview)}")
-        lines.append("\n💻ANDY (el+lin2)🛠️🪛 📍Ave 3️⃣7️⃣ - #️⃣4️⃣2️⃣1️⃣1️⃣ ➗4️⃣2️⃣ y 4️⃣8️⃣ cerca del CVD 🏟️ 📌MAYABEQUE SAN JOSÉ")
+        lines.append(f"\n{get_dynamic_closing(overview)}{SIGNATURE}")
         
         caption = '\n'.join(lines)
         
-        if poster_url:
-            await update.message.reply_photo(photo=poster_url, caption=caption, parse_mode='HTML')
-        else:
-            await update.message.reply_text(caption, parse_mode='HTML')
+        await _send_formatted_reply(update, poster_url, caption)
             
     except Exception as e:
-        print(f"Error publicando item: {e}")
+        logger.error(f"Error publicando item de TMDb: {e}")
         await update.message.reply_text("Hubo un error al procesar la información. Intenta de nuevo.")
 
-SELECTING = 1
+async def _send_formatted_reply(update: Update, image_url: str | None, caption: str):
+    """Envía un mensaje con foto si la URL existe, de lo contrario solo texto."""
+    if image_url:
+        await update.message.reply_photo(photo=image_url, caption=caption, parse_mode='HTML')
+    elif caption:
+        await update.message.reply_text(caption, parse_mode='HTML')
+
+# --- Manejadores del Bot ---
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text('¡Hola! 👋 Envíame el nombre de la película o serie que buscas (ejemplo: Inception)')
+    context.user_data.clear()
+    return ConversationHandler.END
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         text = update.message.text.strip()
         found = await search_tmdb_and_show_options(update, context, text)
-        if found and update.effective_user.id in user_matches:
-            # Hay varias coincidencias, cambiamos al estado SELECTING
-            return SELECTING
-        if not found:
-            # Si no hay resultados en TMDb, buscar en TVmaze
-            poster, caption = search_tvmaze(text)
-            if poster and caption:
-                await update.message.reply_photo(photo=poster, caption=caption, parse_mode='HTML')
-                return
-            elif caption:
-                await update.message.reply_text(caption, parse_mode='HTML')
-                return
-            # Si no hay resultados en TVmaze, buscar en OMDb
-            poster, caption = search_omdb(text)
-            if poster and caption:
-                await update.message.reply_photo(photo=poster, caption=caption, parse_mode='HTML')
-                return
-            elif caption:
-                await update.message.reply_text(caption, parse_mode='HTML')
-                return
-            await update.message.reply_text("No encontré nada con ese nombre 😢\nIntenta con otro título o verifica la ortografía.")
-    except Exception as e:
-        print(f"Error en handle_message: {e}")
-        await update.message.reply_text("Hubo un error al procesar tu búsqueda. Intenta de nuevo.")
+        
+        if found:
+            # Si hay una sola coincidencia, ya se publicó. Si hay varias, esperamos la selección.
+            if context.user_data.get('matches'):
+                return SELECTING
+            return ConversationHandler.END
 
+        # Si no hay resultados en TMDb, buscar en APIs de fallback
+        poster, caption = await search_tvmaze(text)
+        if caption:
+            await _send_formatted_reply(update, poster, caption)
+            return ConversationHandler.END
+
+        poster, caption = await search_omdb(text)
+        if caption:
+            await _send_formatted_reply(update, poster, caption)
+            return ConversationHandler.END
+
+        await update.message.reply_text("No encontré nada con ese nombre 😢\nIntenta con otro título o verifica la ortografía.")
+        return ConversationHandler.END
+
+    except Exception as e:
+        logger.error(f"Error en handle_message: {e}")
+        await update.message.reply_text("Hubo un error al procesar tu búsqueda. Intenta de nuevo.")
+        return ConversationHandler.END
 
 async def select_option(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
-    options = user_matches.get(user_id)
+    options = context.user_data.get('matches')
     if not options:
-        await update.message.reply_text('No hay opciones guardadas. Escribe el nombre de la película o serie.')
+        await update.message.reply_text('No hay opciones guardadas. Vuelve a empezar con /start.')
         return ConversationHandler.END
     try:
         idx = int(update.message.text.strip()) - 1
-        if idx < 0 or idx >= len(options):
-            await update.message.reply_text('Opción inválida. Intenta de nuevo.')
+        if not (0 <= idx < len(options)):
+            await update.message.reply_text('Opción inválida. Elige un número de la lista.')
             return SELECTING
         
         item = options[idx]
-        await publish_tmdb_item(update, context, item, item['is_movie'])
-        del user_matches[user_id]
+        await publish_tmdb_item(update, item)
+        context.user_data.clear()
         return ConversationHandler.END
         
     except ValueError:
         await update.message.reply_text('Por favor, responde con el número de la opción.')
         return SELECTING
     except Exception as e:
-        print(f"Error en select_option: {e}")
+        logger.error(f"Error en select_option: {e}")
         await update.message.reply_text('Hubo un error. Intenta de nuevo.')
+        context.user_data.clear()
         return ConversationHandler.END
 
-if __name__ == '__main__':
-    try:
-        app = ApplicationBuilder().token(BOT_TOKEN).build()
-        
-        conv_handler = ConversationHandler(
-            entry_points=[
-                CommandHandler('start', start),
-                MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message)
-            ],
-            states={
-                SELECTING: [MessageHandler(filters.Regex(r'^\d+$'), select_option)]
-            },
-            fallbacks=[CommandHandler('start', start)]
-        )
+async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Cancela la operación actual."""
+    await update.message.reply_text('Operación cancelada. Puedes empezar de nuevo cuando quieras.')
+    context.user_data.clear()
+    return ConversationHandler.END
 
-        app.add_handler(conv_handler)
-        
-        print("Bot iniciado...")
-        app.run_polling()
-    except Exception as e:
-        print(f"Error al iniciar el bot: {e}")
+def main() -> None:
+    """Inicia el bot."""
+    if not all([BOT_TOKEN, TMDB_API_KEY]):
+        logger.critical("Faltan variables de entorno críticas (BOT_TOKEN, TMDB_API_KEY). El bot no puede iniciar.")
+        return
+
+    app = ApplicationBuilder().token(BOT_TOKEN).build()
+    
+    conv_handler = ConversationHandler(
+        entry_points=[MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message)],
+        states={
+            SELECTING: [MessageHandler(filters.Regex(r'^\d+$'), select_option)]
+        },
+        fallbacks=[
+            CommandHandler('start', start),
+            CommandHandler('cancel', cancel)
+        ]
+    )
+
+    app.add_handler(CommandHandler('start', start))
+    app.add_handler(conv_handler)
+    
+    logger.info("Bot iniciado...")
+    app.run_polling()
+
+if __name__ == '__main__':
+    main()
