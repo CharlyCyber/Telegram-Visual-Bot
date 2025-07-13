@@ -283,11 +283,13 @@ async def _send_formatted_reply(update: Update, image_url: str | None, caption: 
 # --- Manejadores del Bot ---
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text('¡Hola! 👋 Envíame el nombre de la película o serie que buscas (ejemplo: Inception)')
-    context.user_data.clear()
+    print("start llamado")  # Esto nos ayudará a ver en los logs cuando se llama a start
+    await update.message.reply_text('Envíame el nombre de la película o serie (ejemplo: Inception)')
+    context.user_data.clear()  # Limpiamos cualquier dato previo del usuario
     return ConversationHandler.END
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    print("handle_message llamado")
     try:
         text = update.message.text.strip()
         found = await search_tmdb_and_show_options(update, context, text)
@@ -318,6 +320,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return ConversationHandler.END
 
 async def select_option(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    print("select_option llamado")
     options = context.user_data.get('matches')
     if not options:
         await update.message.reply_text('No hay opciones guardadas. Vuelve a empezar con /start.')
@@ -327,12 +330,10 @@ async def select_option(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not (0 <= idx < len(options)):
             await update.message.reply_text('Opción inválida. Elige un número de la lista.')
             return SELECTING
-        
         item = options[idx]
         await publish_tmdb_item(update, item)
         context.user_data.clear()
         return ConversationHandler.END
-        
     except ValueError:
         await update.message.reply_text('Por favor, responde con el número de la opción.')
         return SELECTING
