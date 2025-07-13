@@ -1,22 +1,14 @@
 import os
-import random
 import requests
+import random
 from telegram import Update
-from telegram.ext import (
-    ApplicationBuilder,
-    CommandHandler,
-    ContextTypes,
-    MessageHandler,
-    filters,
-    ConversationHandler,
-)
+from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes, MessageHandler, filters, ConversationHandler
 
-# ─────────── CONFIGURACIÓN ───────────
-BOT_TOKEN   = os.getenv("BOT_TOKEN",   "7726628351:AAGtS54WxgnTPDw1xvwREn-gFsl1WC9Eg9Q")
+BOT_TOKEN = os.getenv("BOT_TOKEN", "7726628351:AAGtS54WxgnTPDw1xvwREn-gFsl1WC9Eg9Q")
 TMDB_API_KEY = os.getenv("TMDB_API_KEY", "6be7b144ecef91b9d6eaf39946b5273f")
-OMDB_API_KEY = os.getenv("OMDB_API_KEY", "d06982f2")
+CHAT_ID = -1002700094661
 
-# ─────────── DICCIONARIOS DE EMOJIS ───────────
+# Diccionarios de emojis (igual que antes)
 genre_emojis_dict = {
     'Acción': '🔥', 'Aventura': '🗺️', 'Animación': '🎨', 'Comedia': '😂',
     'Crimen': '🕵️', 'Documental': '🎥', 'Drama': '🎭', 'Familia': '👨‍👩‍👧‍👦',
@@ -42,8 +34,6 @@ synopsis_keyword_emojis = {
     'superhéroe': '🦸', 'magia': '✨', 'batalla': '⚔️', 'sueño': '💤',
     'dinero': '💰', 'rescate': '🆘', 'explosión': '💥', 'coche': '🚗',
 }
-
-# ─────────── FUNCIONES AUXILIARES ───────────
 def get_genre_emojis(genres):
     return ' '.join(sorted({genre_emojis_dict.get(g, '🎬') for g in genres}))
 
@@ -81,80 +71,85 @@ def get_dynamic_closing(synopsis):
         "¡Una experiencia que no olvidarás! ⭐"
     ])
 
-# ─────────── BÚSQUEDAS ───────────
-def search_tvmaze(query):
-    url = f'https://api.tvmaze.com/search/shows?q={query}'
-    r = requests.get(url)
-    data = r.json()
-    if not data:
-        return None, None
-    show = data[0]['show']
-    title  = show.get('name', 'Sin título')
-    year   = show.get('premiered', '')[:4]
-    overview = show.get('summary', '').replace('<p>', '').replace('</p>', '').replace('<b>', '').replace('</b>', '')
-    genres   = show.get('genres', [])
-    poster   = show['image']['original'] if show.get('image') else None
-    runtime  = f"{show['runtime']} min" if show.get('runtime') else None
-    rating   = show.get('rating', {}).get('average')
-    cast_r   = requests.get(f'https://api.tvmaze.com/shows/{show["id"]}/cast').json()
-    cast     = ', '.join([c['person']['name'] for c in cast_r[:4]]) if cast_r else ''
+# --- Búsqueda en TMDb y lógica de coincidencias ---
+user_matches = {}
 
-    genre_emojis  = get_genre_emojis(genres)
-    keyword_emojis= get_keyword_emojis(title)
-    overview_emo  = get_synopsis_with_emojis(overview)
-    closing       = get_dynamic_closing(overview)
+async def search_tmdb_and_show_options(update: Update, context: ContextTypes.DEFAULT_TYPE, query: str):
+    url_movie = f'https://api.themoviedb.org/3/search/movie?api_key={TMDB_API_KEY}&query={query}&language=es-ES'
+    url_tv = f'https://api.themoviedb.org/3/search/tv?api_key={TMDB_API_KEY}&query={query}&language=es-ES'
+    r_movie = requests.get(url_movie)
+    r_tv = requests.get(url_tv)
+    data_movie = r_movie.json()
+    data_tv = r_tv.json()
+    results = []
+    for item in data_movie.get('results', []):
+        item['is_movie'] = True
+        results.append(item)
+    for item in data_tv.get('results', []):
+        item['is_movie'] = False
+        results.append(item)
+    if not results:
+        return False
+    if len(results) == 1:
+        await publish_tmdb_item(update, context, results[0], results[0]['is_movie'])
+        return True
+    # Mostrar opciones
+    user_matches[update.effective_user.id] = results
+    msg = 'Se encontraron varias coincidencias. Responde con el número de la opción que deseas publicar:\n\n'
+    for idx, item in enumerate(results, 1):
+        title = item.get('title') or item.get('name', 'Sin título')
+        date = item.get('release_date') or item.get('first_air_date', '')
+        tipo = 'Película' if item['is_movie'] else 'Serie'
+        msg += f"{idx}. {title} ({date[:4] if date else 'N/D'}) [{tipo}]\n"
+    await update.message.reply_text(msg)
+    return True
 
+async def publish_tmdb_item(update, context, item, is_movie):
+    if is_movie:
+        title = item.get('title', 'Sin título')
+        id_ = item['id']
+        details_url = f'https://api.themoviedb.org/3/movie/{id_}?api_key={TMDB_API_KEY}&language=es-ES&append_to_response=credits'
+    else:
+        title = item.get('name', 'Sin título')
+        id_ = item['id']
+        details_url = f'https://api.themoviedb.org/3/tv/{id_}?api_key={TMDB_API_KEY}&language=es-ES&append_to_response=credits'
+    details = requests.get(details_url).json()
+    overview = details.get('overview', '')
+    genres = [g['name'] for g in details.get('genres', [])]
+    genre_emojis = get_genre_emojis(genres)
+    keyword_emojis = get_keyword_emojis(title)
+    poster_path = details.get('poster_path')
+    poster_url = f'https://image.tmdb.org/t/p/original{poster_path}' if poster_path else None
+    release_date = details.get('release_date') or details.get('first_air_date', '')
+    runtime = details.get('runtime') or (details.get('episode_run_time', [''])[0] if details.get('episode_run_time') else '')
+    if runtime:
+        runtime = f"{runtime} min"
+    vote_average = details.get('vote_average')
+    credits = details.get('credits', {})
+    cast = ', '.join([c['name'] for c in credits.get('cast', [])[:4]])
+    director = ''
+    for c in credits.get('crew', []):
+        if c['job'] in ['Director', 'Directora']:
+            director = c['name']
+            break
     lines = [
-        f"{keyword_emojis} {genre_emojis} 🎬 <b>{title} ({year})</b> 🎬 {keyword_emojis} {genre_emojis}",
-        "📺 Tipo: Serie",
+        f"{keyword_emojis} {genre_emojis} 🎬 <b>{title} ({release_date[:4] if release_date else 'N/D'})</b> 🎬 {keyword_emojis} {genre_emojis}",
+        f"🎬 Tipo: Película" if is_movie else "📺 Tipo: Serie"
     ]
-    if overview:   lines.append(f"\n📝 <b>Sinopsis:</b>\n{overview_emo}")
+    if overview:   lines.append(f"\n📝 <b>Sinopsis:</b>\n{get_synopsis_with_emojis(overview)}")
     if cast:       lines.append(f"\n🎭 <b>Reparto:</b> {cast}")
+    if director:   lines.append(f"\n🎬 <b>Dirección:</b> {director}")
     if runtime:    lines.append(f"\n🕒 <b>Duración:</b> {runtime}")
-    if rating:     lines.append(f"\n⭐️ <b>Calificación:</b> {rating}/10")
+    if release_date: lines.append(f"\n📅 <b>Estreno:</b> {release_date}")
+    if vote_average: lines.append(f"\n⭐️ <b>Calificación IMDb:</b> {vote_average}/10")
     if genres:     lines.append(f"\n🎞️ <b>Géneros:</b> {', '.join(genres)} {genre_emojis}")
-    lines.append(f"\n{closing}")
+    lines.append(f"\n{get_dynamic_closing(overview)}")
     lines.append("\n💻ANDY (el+lin2)🛠️🪛 📍Ave 3️⃣7️⃣ - #️⃣4️⃣2️⃣1️⃣1️⃣ ➗4️⃣2️⃣ y 4️⃣8️⃣ cerca del CVD 🏟️ 📌MAYABEQUE SAN JOSÉ")
-    return poster, '\n'.join(lines)
-
-def search_omdb(title, year=''):
-    url = f'http://www.omdbapi.com/?t={title}&y={year}&apikey={OMDB_API_KEY}&plot=full'
-    r = requests.get(url)
-    data = r.json()
-    if data.get('Response') != 'True':
-        return None, None
-    tit   = data.get('Title')
-    ano   = data.get('Year')
-    plot  = data.get('Plot')
-    genres= data.get('Genre', '').split(', ')
-    poster= data.get('Poster') if data.get('Poster') != 'N/A' else None
-    runtime= data.get('Runtime')
-    rating = data.get('imdbRating')
-    cast   = data.get('Actors')
-    director = data.get('Director')
-    awards   = data.get('Awards')
-
-    genre_emojis  = get_genre_emojis(genres)
-    keyword_emojis= get_keyword_emojis(tit)
-    plot_emo      = get_synopsis_with_emojis(plot)
-    closing       = get_dynamic_closing(plot)
-
-    lines = [
-        f"{keyword_emojis} {genre_emojis} 🎬 <b>{tit} ({ano})</b> 🎬 {keyword_emojis} {genre_emojis}",
-        f"🎬 Tipo: Película" if data.get('Type') == 'movie' else "📺 Tipo: Serie"
-    ]
-    if plot:        lines.append(f"\n📝 <b>Sinopsis:</b>\n{plot_emo}")
-    if cast:        lines.append(f"\n🎭 <b>Reparto:</b> {cast}")
-    if director:    lines.append(f"\n🎬 <b>Dirección:</b> {director}")
-    if runtime:     lines.append(f"\n🕒 <b>Duración:</b> {runtime}")
-    if rating:      lines.append(f"\n⭐️ <b>Calificación IMDb:</b> {rating}/10")
-    if awards:      lines.append(f"\n🏆 <b>Premios:</b> {awards}")
-    if genres:      lines.append(f"\n🎞️ <b>Géneros:</b> {', '.join(genres)} {genre_emojis}")
-    lines.append(f"\n{closing}")
-    lines.append("\n💻ANDY (el+lin2)🛠️🪛 📍Ave 3️⃣7️⃣ - #️⃣4️⃣2️⃣1️⃣1️⃣ ➗4️⃣2️⃣ y 4️⃣8️⃣ cerca del CVD 🏟️ 📌MAYABEQUE SAN JOSÉ")
-    return poster, '\n'.join(lines)
-
-# ─────────── HANDLERS ───────────
+    caption = '\n'.join(lines)
+    if poster_url:
+        await update.message.reply_photo(photo=poster_url, caption=caption, parse_mode='HTML')
+    else:
+        await update.message.reply_text(caption, parse_mode='HTML')
 SELECTING = 1
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -162,23 +157,38 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip()
-    poster, caption = search_tvmaze(text)
-    if not poster:
-        poster, caption = search_omdb(text)
-    if poster:
-        await update.message.reply_photo(photo=poster, caption=caption, parse_mode='HTML')
-    else:
-        await update.message.reply_text("No encontré nada con ese nombre 😢")
+    found = await search_tmdb_and_show_options(update, context, text)
+    if not found:
+        # Si no hay resultados en TMDb, buscar en TVmaze y OMDb
+        poster, caption = search_tvmaze(text)
+        if not poster:
+            poster, caption = search_omdb(text)
+        if poster:
+            await update.message.reply_photo(photo=poster, caption=caption, parse_mode='HTML')
+        else:
+            await update.message.reply_text("No encontré nada con ese nombre 😢")
 
 async def select_option(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # Simplificado: si usas ConversationHandler tendrás que adaptar la lógica.
-    await handle_message(update, context)
-    return ConversationHandler.END
+    user_id = update.effective_user.id
+    options = user_matches.get(user_id)
+    if not options:
+        await update.message.reply_text('No hay opciones guardadas. Escribe el nombre de la película o serie.')
+        return ConversationHandler.END
+    try:
+        idx = int(update.message.text.strip()) - 1
+        if idx < 0 or idx >= len(options):
+            await update.message.reply_text('Opción inválida. Intenta de nuevo.')
+            return SELECTING
+        item = options[idx]
+        await publish_tmdb_item(update, context, item, item['is_movie'])
+        del user_matches[user_id]
+        return ConversationHandler.END
+    except Exception:
+        await update.message.reply_text('Por favor, responde con el número de la opción.')
+        return SELECTING
 
-# ─────────── MAIN ───────────
 if __name__ == '__main__':
     app = ApplicationBuilder().token(BOT_TOKEN).build()
-
     conv_handler = ConversationHandler(
         entry_points=[CommandHandler('start', start),
                       MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message)],
@@ -187,6 +197,5 @@ if __name__ == '__main__':
         },
         fallbacks=[CommandHandler('start', start)]
     )
-
     app.add_handler(conv_handler)
     app.run_polling()
