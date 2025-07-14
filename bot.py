@@ -3,8 +3,12 @@ import asyncio
 import httpx
 import random
 import logging
+from dotenv import load_dotenv
 from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes, MessageHandler, filters, ConversationHandler
+
+# Cargar variables de entorno
+load_dotenv()
 
 # --- Configuración y Constantes ---
 logging.basicConfig(
@@ -383,7 +387,11 @@ def main() -> None:
     except Exception as e:
         logger.error(f"Error limpiando updates: {e}")
 
-    app.run_polling()
+    # Limpiar updates pendientes
+loop = asyncio.new_event_loop()
+asyncio.set_event_loop(loop)
+loop.run_until_complete(app.bot.get_updates(offset=-1))
+app.run_polling()
 
 if __name__ == '__main__':
     main()
