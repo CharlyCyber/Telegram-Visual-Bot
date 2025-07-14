@@ -379,19 +379,8 @@ def main() -> None:
     app.add_handler(CommandHandler('start', start))
     app.add_handler(conv_handler)
     
-        logger.info("Bot iniciado...")
-    # Limpiar updates pendientes al inicio
-    try:
-        asyncio.run(app.bot.get_updates(offset=-1))
-        logger.info("Updates pendientes limpiados")
-    except Exception as e:
-        logger.error(f"Error limpiando updates: {e}")
-
-    # Limpiar updates pendientes
-loop = asyncio.new_event_loop()
-asyncio.set_event_loop(loop)
-loop.run_until_complete(app.bot.get_updates(offset=-1))
-app.run_polling()
+    logger.info("Bot iniciado...")
+    app.run_polling()
 
 if __name__ == '__main__':
     main()
