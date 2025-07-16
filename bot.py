@@ -303,37 +303,31 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         year = None
 
     # Buscar en TMDb (películas)
-    url = f'https://api.themoviedb.org/3/search/movie?api_key={TMDB_API_KEY}&query={name}&language=es-ES'
+    url_movie = f'https://api.themoviedb.org/3/search/movie?api_key={TMDB_API_KEY}&query={name}&language=es-ES'
     if year:
-        url += f'&year={year}'
-    r = requests.get(url)
-    data = r.json()
-    is_movie = True
+        url_movie += f'&year={year}'
+    r_movie = requests.get(url_movie)
+    data_movie = r_movie.json().get('results', [])
 
-    # Si no hay resultados y se usó año, intentar solo con nombre
-    if not data['results'] and year:
-        url = f'https://api.themoviedb.org/3/search/movie?api_key={TMDB_API_KEY}&query={name}&language=es-ES'
-        r = requests.get(url)
-        data = r.json()
+    # Buscar en TMDb (series)
+    url_tv = f'https://api.themoviedb.org/3/search/tv?api_key={TMDB_API_KEY}&query={name}&language=es-ES'
+    if year:
+        url_tv += f'&first_air_date_year={year}'
+    r_tv = requests.get(url_tv)
+    data_tv = r_tv.json().get('results', [])
 
-    if not data['results']:
-        # Buscar en TMDb (series)
-        url = f'https://api.themoviedb.org/3/search/tv?api_key={TMDB_API_KEY}&query={name}&language=es-ES'
-        if year:
-            url += f'&first_air_date_year={year}'
-        r = requests.get(url)
-        data = r.json()
-        is_movie = False
+    # Combinar resultados y marcar tipo
+    combined = []
+    for item in data_movie:
+        item['__type'] = 'movie'
+        combined.append(item)
+    for item in data_tv:
+        item['__type'] = 'tv'
+        combined.append(item)
 
-        # Si no hay resultados y se usó año, intentar solo con nombre
-        if not data['results'] and year:
-            url = f'https://api.themoviedb.org/3/search/tv?api_key={TMDB_API_KEY}&query={name}&language=es-ES'
-            r = requests.get(url)
-            data = r.json()
-
-    if not data['results']:
+    if not combined:
         # Buscar en TVmaze como último recurso
-        poster_url, caption = await search_tvmaze(name)
+        poster_url, caption = search_tvmaze(name)
         if not caption:
             await update.message.reply_text('No se encontró el material. Intenta con otro nombre o año.')
             return
@@ -344,23 +338,27 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     # Si hay más de una coincidencia, mostrar opciones
-    if len(data['results']) > 1:
-        context.user_data['options'] = data['results']
-        context.user_data['is_movie'] = is_movie
+    if len(combined) > 1:
+        context.user_data['options'] = combined
         msg = 'Se encontraron varias coincidencias. Responde con el número de la opción que deseas publicar:\n\n'
-        for idx, item in enumerate(data['results'], 1):
-            if is_movie:
+        for idx, item in enumerate(combined, 1):
+            if item['__type'] == 'movie':
                 title = item.get('title', 'Sin título')
                 date = item.get('release_date', '')
+                tipo = '🎬 Película'
             else:
                 title = item.get('name', 'Sin título')
                 date = item.get('first_air_date', '')
-            msg += f"{idx}. {title} ({date[:4]})\n"
+                tipo = '📺 Serie'
+            msg += f"{idx}. {title} ({date[:4]}) {tipo}\n"
         await update.message.reply_text(msg)
         return SELECTING
 
     # Si solo hay una coincidencia, publicar directamente
-    await publish_tmdb_item(update, context, data['results'][0], is_movie, year)
+    item = combined[0]
+    is_movie = item['__type'] == 'movie'
+    year = item.get('release_date', '')[:4] if is_movie else item.get('first_air_date', '')[:4]
+    await publish_tmdb_item(update, context, item, is_movie, year)
 
 async def select_option(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
