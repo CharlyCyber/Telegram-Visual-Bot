@@ -3,6 +3,7 @@ import asyncio
 import httpx
 import random
 import logging
+logging.basicConfig(level=logging.INFO)
 from dotenv import load_dotenv
 from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes, MessageHandler, filters, ConversationHandler
@@ -179,16 +180,16 @@ async def search_tmdb_and_show_options(update: Update, context: ContextTypes.DEF
         async with httpx.AsyncClient() as client:
             url_movie = f'https://api.themoviedb.org/3/search/movie?api_key={TMDB_API_KEY}&query={query}&language=es-ES'
             url_tv = f'https://api.themoviedb.org/3/search/tv?api_key={TMDB_API_KEY}&query={query}&language=es-ES'
-            
+
             r_movie, r_tv = await asyncio.gather(
                 client.get(url_movie, timeout=10),
                 client.get(url_tv, timeout=10)
             )
             data_movie = r_movie.json()
-            print('TMDb movie:', data_movie)
             data_tv = r_tv.json()
-            print('TMDb tv:', data_tv)
-        
+            logging.info(f'TMDb movie: {data_movie}')
+            logging.info(f'TMDb tv: {data_tv}')
+
         results = []
         for item in data_movie.get('results', []):
             item['is_movie'] = True
@@ -196,14 +197,14 @@ async def search_tmdb_and_show_options(update: Update, context: ContextTypes.DEF
         for item in data_tv.get('results', []):
             item['is_movie'] = False
             results.append(item)
-            
+
         if not results:
             return False
-            
+
         if len(results) == 1:
             await publish_tmdb_item(update, results[0])
             return True
-            
+
         # Mostrar opciones
         context.user_data['matches'] = results
         msg = 'Se encontraron varias coincidencias. Responde con el número de la opción que deseas publicar:\n\n'
@@ -214,7 +215,7 @@ async def search_tmdb_and_show_options(update: Update, context: ContextTypes.DEF
             msg += f"{idx}. {title} ({date[:4] if date else 'N/D'}) [{tipo}]\n"
         await update.message.reply_text(msg)
         return True
-        
+
     except httpx.RequestError as e:
         logger.error(f"Error de red en TMDb: {e}")
         return False
