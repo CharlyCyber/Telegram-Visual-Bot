@@ -364,11 +364,11 @@ async def select_option(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         idx = int(update.message.text.strip()) - 1
         options = context.user_data.get('options', [])
-        is_movie = context.user_data.get('is_movie', True)
         if idx < 0 or idx >= len(options):
             await update.message.reply_text('Opción inválida. Intenta de nuevo.')
             return SELECTING
         item = options[idx]
+        is_movie = item.get('__type') == 'movie'
         year = item.get('release_date', '')[:4] if is_movie else item.get('first_air_date', '')[:4]
         await publish_tmdb_item(update, context, item, is_movie, year)
         context.user_data.clear()
