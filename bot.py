@@ -3,6 +3,7 @@ import asyncio
 import httpx
 import random
 import logging
+import requests
 logging.basicConfig(level=logging.INFO)
 from dotenv import load_dotenv
 from telegram import Update
@@ -220,8 +221,7 @@ async def search_tmdb_and_show_options(update: Update, context: ContextTypes.DEF
         logger.error(f"Error de red en TMDb: {e}")
         return False
 
-async def publish_tmdb_item(update: Update, item: dict):
-    is_movie = item.get('is_movie', False)
+async def publish_tmdb_item(update: Update, context, item, is_movie, year=None):
     try:
         if is_movie:
             title = item.get('title', 'Sin título')
@@ -231,11 +231,10 @@ async def publish_tmdb_item(update: Update, item: dict):
             title = item.get('name', 'Sin título')
             id_ = item['id']
             details_url = f'https://api.themoviedb.org/3/tv/{id_}?api_key={TMDB_API_KEY}&language=es-ES&append_to_response=credits'
-        
-        async with httpx.AsyncClient() as client:
-            response = await client.get(details_url, timeout=10)
-            details = response.json()
-        
+
+        r = requests.get(details_url)
+        details = r.json()
+
         overview = details.get('overview', '')
         genres = [g['name'] for g in details.get('genres', [])]
         genre_emojis = get_genre_emojis(genres)
@@ -244,25 +243,20 @@ async def publish_tmdb_item(update: Update, item: dict):
         poster_url = f'https://image.tmdb.org/t/p/original{poster_path}' if poster_path else None
         release_date = details.get('release_date') or details.get('first_air_date', '')
         runtime = details.get('runtime') or (details.get('episode_run_time', [''])[0] if details.get('episode_run_time') else '')
-        
         if runtime:
             runtime = f"{runtime} min"
-            
         vote_average = details.get('vote_average')
         credits = details.get('credits', {})
         cast = ', '.join([c['name'] for c in credits.get('cast', [])[:4]])
-        
         director = ''
         for c in credits.get('crew', []):
             if c['job'] in ['Director', 'Directora']:
                 director = c['name']
                 break
-                
         lines = [
             f"{keyword_emojis} {genre_emojis} 🎬 <b>{title} ({release_date[:4] if release_date else 'N/D'})</b> 🎬 {keyword_emojis} {genre_emojis}",
             f"🎬 Tipo: Película" if is_movie else "📺 Tipo: Serie"
         ]
-        
         if overview:   lines.append(f"\n📝 <b>Sinopsis:</b>\n{get_synopsis_with_emojis(overview)}")
         if cast:       lines.append(f"\n🎭 <b>Reparto:</b> {cast}")
         if director:   lines.append(f"\n🎬 <b>Dirección:</b> {director}")
@@ -270,13 +264,12 @@ async def publish_tmdb_item(update: Update, item: dict):
         if release_date: lines.append(f"\n📅 <b>Estreno:</b> {release_date}")
         if vote_average: lines.append(f"\n⭐️ <b>Calificación IMDb:</b> {vote_average}/10")
         if genres:     lines.append(f"\n🎞️ <b>Géneros:</b> {', '.join(genres)} {genre_emojis}")
-        
         lines.append(f"\n{get_dynamic_closing(overview)}{SIGNATURE}")
-        
         caption = '\n'.join(lines)
-        
-        await _send_formatted_reply(update, poster_url, caption)
-            
+        if poster_url:
+            await context.bot.send_photo(chat_id=CHAT_ID, photo=poster_url, caption=caption, parse_mode='HTML')
+        else:
+            await context.bot.send_message(chat_id=CHAT_ID, text=caption, parse_mode='HTML')
     except Exception as e:
         logger.error(f"Error publicando item de TMDb: {e}")
         await update.message.reply_text("Hubo un error al procesar la información. Intenta de nuevo.")
@@ -297,36 +290,77 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return ConversationHandler.END
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    print("handle_message llamado")
+    text = update.message.text.strip()
+    # Intentar separar nombre y año
     try:
-        text = update.message.text.strip()
-        found = await search_tmdb_and_show_options(update, context, text)
-        
-        if found:
-            # Si hay una sola coincidencia, ya se publicó. Si hay varias, esperamos la selección.
-            if context.user_data.get('matches'):
-                return SELECTING
-            return ConversationHandler.END
+        name, year = text.rsplit(' ', 1)
+        year = year.strip()
+        if not year.isdigit():
+            name = text
+            year = None
+    except ValueError:
+        name = text
+        year = None
 
-        # Si no hay resultados en TMDb, buscar en APIs de fallback
-        poster, caption = await search_tvmaze(text)
-        if caption:
-            await _send_formatted_reply(update, poster, caption)
-            return ConversationHandler.END
+    # Buscar en TMDb (películas)
+    url = f'https://api.themoviedb.org/3/search/movie?api_key={TMDB_API_KEY}&query={name}&language=es-ES'
+    if year:
+        url += f'&year={year}'
+    r = requests.get(url)
+    data = r.json()
+    is_movie = True
 
-        poster, caption = await search_omdb(text)
-        if caption:
-            await _send_formatted_reply(update, poster, caption)
-            return ConversationHandler.END
+    # Si no hay resultados y se usó año, intentar solo con nombre
+    if not data['results'] and year:
+        url = f'https://api.themoviedb.org/3/search/movie?api_key={TMDB_API_KEY}&query={name}&language=es-ES'
+        r = requests.get(url)
+        data = r.json()
 
-        await update.message.reply_text("No encontré nada con ese nombre 😢\nIntenta con otro título o verifica la ortografía.")
-        return ConversationHandler.END
+    if not data['results']:
+        # Buscar en TMDb (series)
+        url = f'https://api.themoviedb.org/3/search/tv?api_key={TMDB_API_KEY}&query={name}&language=es-ES'
+        if year:
+            url += f'&first_air_date_year={year}'
+        r = requests.get(url)
+        data = r.json()
+        is_movie = False
 
-    except Exception as e:
-        print(f"Error en handle_message: {e}")
-        print(e)
-        await update.message.reply_text("Hubo un error al procesar tu búsqueda. Intenta de nuevo.")
-        return ConversationHandler.END
+        # Si no hay resultados y se usó año, intentar solo con nombre
+        if not data['results'] and year:
+            url = f'https://api.themoviedb.org/3/search/tv?api_key={TMDB_API_KEY}&query={name}&language=es-ES'
+            r = requests.get(url)
+            data = r.json()
+
+    if not data['results']:
+        # Buscar en TVmaze como último recurso
+        poster_url, caption = await search_tvmaze(name)
+        if not caption:
+            await update.message.reply_text('No se encontró el material. Intenta con otro nombre o año.')
+            return
+        if poster_url:
+            await context.bot.send_photo(chat_id=CHAT_ID, photo=poster_url, caption=caption, parse_mode='HTML')
+        else:
+            await context.bot.send_message(chat_id=CHAT_ID, text=caption, parse_mode='HTML')
+        return
+
+    # Si hay más de una coincidencia, mostrar opciones
+    if len(data['results']) > 1:
+        context.user_data['options'] = data['results']
+        context.user_data['is_movie'] = is_movie
+        msg = 'Se encontraron varias coincidencias. Responde con el número de la opción que deseas publicar:\n\n'
+        for idx, item in enumerate(data['results'], 1):
+            if is_movie:
+                title = item.get('title', 'Sin título')
+                date = item.get('release_date', '')
+            else:
+                title = item.get('name', 'Sin título')
+                date = item.get('first_air_date', '')
+            msg += f"{idx}. {title} ({date[:4]})\n"
+        await update.message.reply_text(msg)
+        return SELECTING
+
+    # Si solo hay una coincidencia, publicar directamente
+    await publish_tmdb_item(update, context, data['results'][0], is_movie, year)
 
 async def select_option(update: Update, context: ContextTypes.DEFAULT_TYPE):
     print("select_option llamado")
