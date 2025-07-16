@@ -363,28 +363,21 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await publish_tmdb_item(update, context, data['results'][0], is_movie, year)
 
 async def select_option(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    print("select_option llamado")
-    options = context.user_data.get('matches')
-    if not options:
-        await update.message.reply_text('No hay opciones guardadas. Vuelve a empezar con /start.')
-        return ConversationHandler.END
     try:
         idx = int(update.message.text.strip()) - 1
-        if not (0 <= idx < len(options)):
-            await update.message.reply_text('Opción inválida. Elige un número de la lista.')
+        options = context.user_data.get('options', [])
+        is_movie = context.user_data.get('is_movie', True)
+        if idx < 0 or idx >= len(options):
+            await update.message.reply_text('Opción inválida. Intenta de nuevo.')
             return SELECTING
         item = options[idx]
-        await publish_tmdb_item(update, item)
+        year = item.get('release_date', '')[:4] if is_movie else item.get('first_air_date', '')[:4]
+        await publish_tmdb_item(update, context, item, is_movie, year)
         context.user_data.clear()
         return ConversationHandler.END
-    except ValueError:
+    except Exception:
         await update.message.reply_text('Por favor, responde con el número de la opción.')
         return SELECTING
-    except Exception as e:
-        logger.error(f"Error en select_option: {e}")
-        await update.message.reply_text('Hubo un error. Intenta de nuevo.')
-        context.user_data.clear()
-        return ConversationHandler.END
 
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Cancela la operación actual."""
