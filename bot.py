@@ -223,17 +223,18 @@ async def search_tmdb_and_show_options(update: Update, context: ContextTypes.DEF
 
 async def publish_tmdb_item(update: Update, context, item, is_movie, year=None):
     try:
-        if is_movie:
-            title = item.get('title', 'Sin título')
-            id_ = item['id']
-            details_url = f'https://api.themoviedb.org/3/movie/{id_}?api_key={TMDB_API_KEY}&language=es-ES&append_to_response=credits'
-        else:
-            title = item.get('name', 'Sin título')
-            id_ = item['id']
-            details_url = f'https://api.themoviedb.org/3/tv/{id_}?api_key={TMDB_API_KEY}&language=es-ES&append_to_response=credits'
+        async with httpx.AsyncClient() as client:
+            if is_movie:
+                title = item.get('title', 'Sin título')
+                id_ = item['id']
+                details_url = f'https://api.themoviedb.org/3/movie/{id_}?api_key={TMDB_API_KEY}&language=es-ES&append_to_response=credits'
+            else:
+                title = item.get('name', 'Sin título')
+                id_ = item['id']
+                details_url = f'https://api.themoviedb.org/3/tv/{id_}?api_key={TMDB_API_KEY}&language=es-ES&append_to_response=credits'
 
-        r = requests.get(details_url)
-        details = r.json()
+            r = await client.get(details_url)
+            details = r.json()
 
         overview = details.get('overview', '')
         genres = [g['name'] for g in details.get('genres', [])]
@@ -302,19 +303,20 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         name = text
         year = None
 
-    # Buscar en TMDb (películas)
-    url_movie = f'https://api.themoviedb.org/3/search/movie?api_key={TMDB_API_KEY}&query={name}&language=es-ES'
-    if year:
-        url_movie += f'&year={year}'
-    r_movie = requests.get(url_movie)
-    data_movie = r_movie.json().get('results', [])
+    async with httpx.AsyncClient() as client:
+        # Buscar en TMDb (películas)
+        url_movie = f'https://api.themoviedb.org/3/search/movie?api_key={TMDB_API_KEY}&query={name}&language=es-ES'
+        if year:
+            url_movie += f'&year={year}'
+        r_movie = await client.get(url_movie)
+        data_movie = r_movie.json().get('results', [])
 
-    # Buscar en TMDb (series)
-    url_tv = f'https://api.themoviedb.org/3/search/tv?api_key={TMDB_API_KEY}&query={name}&language=es-ES'
-    if year:
-        url_tv += f'&first_air_date_year={year}'
-    r_tv = requests.get(url_tv)
-    data_tv = r_tv.json().get('results', [])
+        # Buscar en TMDb (series)
+        url_tv = f'https://api.themoviedb.org/3/search/tv?api_key={TMDB_API_KEY}&query={name}&language=es-ES'
+        if year:
+            url_tv += f'&first_air_date_year={year}'
+        r_tv = await client.get(url_tv)
+        data_tv = r_tv.json().get('results', [])
 
     # Combinar resultados y marcar tipo
     combined = []
