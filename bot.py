@@ -6,7 +6,7 @@ import logging
 import requests
 logging.basicConfig(level=logging.INFO)
 from dotenv import load_dotenv
-from telegram import Update
+from telegram import Update, ChatMember
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes, MessageHandler, filters, ConversationHandler
 
 # Cargar variables de entorno
@@ -28,6 +28,59 @@ SIGNATURE = "\n\n💻ANDY (el+lin2)🛠️🪛 📍Ave 3️⃣7️⃣ - #️⃣4
 
 # Estados de la conversación
 SELECTING = 1
+
+# --- SISTEMA ANTI-SPAM ---
+
+# Palabras clave de spam (en minúsculas)
+SPAM_KEYWORDS = [
+    'free eth', 'free ethereum', 'airdrop', 'crypto', 'wallet', 'btc', 'bitcoin',
+    'claim', 'earn money', 'make money', 'click here', 'visit', 'www.', 'http',
+    'telegram.me', 't.me', 'limited time', 'don\'t miss', 'act now', 'hurry',
+    'exclusive', 'secret', 'guaranteed', 'risk free', 'no fees', 'instant',
+    'register now', 'sign up', 'click', 'link', 'promo', 'offer', 'deal',
+    'investment', 'profit', 'roi', 'trading', 'forex', 'binary', 'casino',
+    'lottery', 'winner', 'prize', 'reward', 'bonus', 'gift', 'free money',
+    'easy money', 'passive income', 'work from home', 'mlm', 'pyramid'
+]
+
+# URLs sospechosas
+SPAM_URLS = [
+    'freeether.net', 'freecrypto', 'airdrop', 'claimmoney', 'earneth',
+    'bitcoinfree', 'cryptogift', 'freetokens'
+]
+
+def is_spam_message(text: str) -> bool:
+    """Detecta si un mensaje es spam"""
+    if not text:
+        return False
+    
+    text_lower = text.lower()
+    
+    # Verificar palabras clave de spam
+    spam_count = sum(1 for keyword in SPAM_KEYWORDS if keyword in text_lower)
+    
+    # Verificar URLs sospechosas
+    url_spam = any(url in text_lower for url in SPAM_URLS)
+    
+    # Detectar patrones de spam
+    has_excessive_emojis = text.count('🚨') > 1 or text.count('💰') > 1 or text.count('🔥') > 1
+    has_urgent_language = any(word in text_lower for word in ['alert!', 'hurry!', 'limited!', 'now!'])
+    has_suspicious_caps = sum(1 for c in text if c.isupper()) > len(text) * 0.3
+    
+    # Mensaje es spam si:
+    # - Tiene 3+ palabras clave de spam
+    # - Tiene URLs sospechosas
+    # - Tiene patrones típicos de spam
+    return spam_count >= 3 or url_spam or (has_excessive_emojis and has_urgent_language) or has_suspicious_caps
+
+async def is_user_in_group(context: ContextTypes.DEFAULT_TYPE, user_id: int) -> bool:
+    """Verifica si el usuario es miembro del grupo"""
+    try:
+        member = await context.bot.get_chat_member(chat_id=CHAT_ID, user_id=user_id)
+        return member.status in [ChatMember.MEMBER, ChatMember.ADMINISTRATOR, ChatMember.OWNER]
+    except Exception as e:
+        logger.warning(f"No se pudo verificar membresía del usuario {user_id}: {e}")
+        return False
 
 # --- Diccionarios de Emojis ---
 
