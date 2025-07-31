@@ -344,7 +344,21 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return ConversationHandler.END
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # FILTRO 1: Verificar si es spam
+    if is_spam_message(update.message.text):
+        logger.info(f"Mensaje de spam ignorado de usuario {update.message.from_user.id}: {update.message.text[:50]}...")
+        return  # Ignorar silenciosamente
+    
+    # FILTRO 2: Verificar si el usuario es miembro del grupo
+    if not await is_user_in_group(context, update.message.from_user.id):
+        logger.info(f"Usuario no autorizado {update.message.from_user.id} intentó usar el bot")
+        return  # Ignorar silenciosamente
+    
     text = update.message.text.strip()
+    
+    # Log de uso legítimo
+    logger.info(f"Procesando búsqueda legítima de usuario {update.message.from_user.id}: {text}")
+    
     # Intentar separar nombre y año
     try:
         name, year = text.rsplit(' ', 1)
@@ -382,7 +396,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if not combined:
         # Buscar en TVmaze como último recurso
-        poster_url, caption = search_tvmaze(name)
+        poster_url, caption = await search_tvmaze(name)
         if not caption:
             await update.message.reply_text('No se encontró el material. Intenta con otro nombre o año.')
             return
