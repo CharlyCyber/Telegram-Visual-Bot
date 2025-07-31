@@ -430,6 +430,11 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await publish_tmdb_item(update, context, item, is_movie, year)
 
 async def select_option(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # FILTRO: Verificar si el usuario es miembro del grupo
+    if not await is_user_in_group(context, update.message.from_user.id):
+        logger.info(f"Usuario no autorizado {update.message.from_user.id} intentó seleccionar opción")
+        return ConversationHandler.END
+    
     try:
         idx = int(update.message.text.strip()) - 1
         options = context.user_data.get('options', [])
