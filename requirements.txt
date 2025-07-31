@@ -2,4 +2,4 @@ python-telegram-bot==20.3
 httpx
 python-dotenv
 supervisor
-requests==2.32.3
+solicitudes==2.31
