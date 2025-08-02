@@ -29,58 +29,104 @@ SIGNATURE = "\n\n💻ANDY (el+lin2)🛠️🪛 📍Ave 3️⃣7️⃣ - #️⃣4
 # Estados de la conversación
 SELECTING = 1
 
-# --- SISTEMA ANTI-SPAM ---
+# --- SISTEMA ANTI-SPAM MEJORADO ---
 
-# Palabras clave de spam (en minúsculas)
+# Palabras clave de spam (en minúsculas) - VERSIÓN MEJORADA
 SPAM_KEYWORDS = [
-    'free eth', 'free ethereum', 'airdrop', 'crypto', 'wallet', 'btc', 'bitcoin',
-    'claim', 'earn money', 'make money', 'click here', 'visit', 'www.', 'http',
-    'telegram.me', 't.me', 'limited time', 'don\'t miss', 'act now', 'hurry',
-    'exclusive', 'secret', 'guaranteed', 'risk free', 'no fees', 'instant',
-    'register now', 'sign up', 'click', 'link', 'promo', 'offer', 'deal',
-    'investment', 'profit', 'roi', 'trading', 'forex', 'binary', 'casino',
-    'lottery', 'winner', 'prize', 'reward', 'bonus', 'gift', 'free money',
-    'easy money', 'passive income', 'work from home', 'mlm', 'pyramid'
+    # Crypto/Casino
+    'free eth', 'free ethereum', 'jetacas', 'casino', 'bonus', 'promo code', 
+    'welcome1k', 'airdrop', 'crypto', 'wallet', 'btc', 'bitcoin', 'claim',
+    'freeether.net', 'eth alert', 'ethereum', 'instant bonus', 'licensed platform',
+    
+    # Términos financieros sospechosos
+    'earn money', 'make money', 'free money', 'easy money', 'passive income',
+    'investment', 'profit', 'roi', 'trading', 'forex', 'binary', 'lottery',
+    'winner', 'prize', 'reward', 'gift', 'no fees', 'risk free', 'guaranteed',
+    
+    # Llamadas a la acción urgentes
+    'click here', 'visit', 'register now', 'sign up', 'act now', 'hurry',
+    'limited time', 'don\'t miss', 'exclusive', 'secret', 'instant',
+    'time-limited', 'won\'t last forever', 'limited airdrop', 'claim now',
+    
+    # URLs y enlaces sospechosos  
+    'www.', 'http', '.com', '.net', 'telegram.me', 't.me', 'link', 'url',
+    
+    # Términos de marketing agresivo
+    'offer', 'deal', 'work from home', 'mlm', 'pyramid', '24/7 support',
+    'minimum deposit', 'withdrawals', 'cards', 'crypto', 'e-wallets',
+    'verification required', 'no strings attached', 'just register',
+    'connect your wallet', 'verify', 'balance grow'
 ]
 
-# URLs sospechosas
+# URLs sospechosas - VERSIÓN MEJORADA
 SPAM_URLS = [
-    'freeether.net', 'freecrypto', 'airdrop', 'claimmoney', 'earneth',
-    'bitcoinfree', 'cryptogift', 'freetokens'
+    'jetacas.com', 'freeether.net', 'freecrypto', 'airdrop', 'claimmoney', 
+    'earneth', 'bitcoinfree', 'cryptogift', 'freetokens', 'casino',
+    'bonus', 'promo', 'claim', 'free', 'earn', 'money'
+]
+
+# Patrones de emojis sospechosos
+SPAM_EMOJI_PATTERNS = [
+    '🚨', '💰', '🔥', '🔑', '📥', '🔒', '⚡️', '🎮', '🕐', '💵', 
+    '✅', '💳', '🤑', '⚡️', '⏳', '👉', '🟢'
 ]
 
 def is_spam_message(text: str) -> bool:
-    """Detecta si un mensaje es spam"""
+    """Detecta si un mensaje es spam - VERSIÓN MEJORADA"""
     if not text:
         return False
     
     text_lower = text.lower()
     
-    # Verificar palabras clave de spam
+    # 1. Verificar palabras clave de spam (umbral más bajo)
     spam_count = sum(1 for keyword in SPAM_KEYWORDS if keyword in text_lower)
     
-    # Verificar URLs sospechosas
+    # 2. Verificar URLs sospechosas
     url_spam = any(url in text_lower for url in SPAM_URLS)
     
-    # Detectar patrones de spam
-    has_excessive_emojis = text.count('🚨') > 1 or text.count('💰') > 1 or text.count('🔥') > 1
-    has_urgent_language = any(word in text_lower for word in ['alert!', 'hurry!', 'limited!', 'now!'])
-    has_suspicious_caps = sum(1 for c in text if c.isupper()) > len(text) * 0.3
+    # 3. Detectar nombres específicos de casinos/scams
+    casino_names = ['jetacas', 'freeether']
+    has_casino_name = any(name in text_lower for name in casino_names)
     
-    # Mensaje es spam si:
-    # - Tiene 3+ palabras clave de spam
-    # - Tiene URLs sospechosas
-    # - Tiene patrones típicos de spam
-    return spam_count >= 3 or url_spam or (has_excessive_emojis and has_urgent_language) or has_suspicious_caps
+    # 4. Detectar patrones de spam
+    has_excessive_emojis = sum(text.count(emoji) for emoji in SPAM_EMOJI_PATTERNS) >= 5
+    has_urgent_language = any(word in text_lower for word in ['alert!', 'hurry!', 'limited!', 'now!', 'act now'])
+    has_suspicious_caps = sum(1 for c in text if c.isupper()) > len(text) * 0.25
+    
+    # 5. Detectar estructura típica de spam de casino
+    casino_structure = (
+        'bonus' in text_lower and 
+        'promo' in text_lower and
+        ('$' in text or '💰' in text)
+    )
+    
+    # 6. Detectar estructura típica de crypto spam
+    crypto_structure = (
+        'free' in text_lower and 
+        'eth' in text_lower and
+        ('wallet' in text_lower or 'claim' in text_lower)
+    )
+    
+    # 7. Verificar longitud excesiva (spam típico es muy largo)
+    is_too_long = len(text) > 500
+    
+    # 8. Detectar múltiples líneas con emojis (estructura de spam)
+    lines_with_emojis = sum(1 for line in text.split('\n') if any(emoji in line for emoji in SPAM_EMOJI_PATTERNS))
+    has_spam_structure = lines_with_emojis >= 4
+    
+    # Mensaje es spam si cumple cualquiera de estos criterios:
+    return (
+        spam_count >= 2 or  # Reducido de 3 a 2 para mayor sensibilidad
+        url_spam or 
+        has_casino_name or
+        casino_structure or 
+        crypto_structure or
+        (has_excessive_emojis and has_urgent_language) or 
+        (has_suspicious_caps and spam_count >= 1) or
+        (is_too_long and spam_count >= 1) or
+        has_spam_structure
+    )
 
-async def is_user_in_group(context: ContextTypes.DEFAULT_TYPE, user_id: int) -> bool:
-    """Verifica si el usuario es miembro del grupo"""
-    try:
-        member = await context.bot.get_chat_member(chat_id=CHAT_ID, user_id=user_id)
-        return member.status in [ChatMember.MEMBER, ChatMember.ADMINISTRATOR, ChatMember.OWNER]
-    except Exception as e:
-        logger.warning(f"No se pudo verificar membresía del usuario {user_id}: {e}")
-        return False
 
 # --- Diccionarios de Emojis ---
 
