@@ -179,13 +179,13 @@ def get_synopsis_with_emojis(synopsis):
 
 def get_dynamic_closing(synopsis):
     s = synopsis.lower()
-    if any(x in s for x in ['misterio', 'secreto']):        return "¡Atrévete a descubrir el misterio! 🕵️‍♂️"
+    if any(x in s for x in ['misterio', 'secreto']):        return "¡Una historia de misterio! 🕵️‍♂️"
     if any(x in s for x in ['aventura', 'viaje']):          return "¡Sumérgete en esta aventura única! 🗺️"
     if any(x in s for x in ['acción', 'batalla']):          return "¡Prepárate para la acción! 🔥"
     if any(x in s for x in ['amor', 'romance']):            return "¡Déjate llevar por esta historia de amor! ❤️"
     if any(x in s for x in ['familia', 'hermano', 'padre']):return "¡Una historia que celebra la familia! 👨‍👩‍👧‍👦"
     if any(x in s for x in ['espacio', 'planeta']):         return "¡Viaja más allá de las estrellas! 🌌"
-    if any(x in s for x in ['terror', 'miedo']):            return "¡Atrévete a sentir el terror! 👻"
+    if any(x in s for x in ['terror', 'miedo']):            return "¡Prepárate a sentir el terror! 👻"
     if any(x in s for x in ['música', 'canción']):          return "¡Déjate llevar por la música! 🎵"
     if any(x in s for x in ['magia', 'fantasía']):          return "¡Descubre un mundo de magia! ✨"
     return random.choice([
