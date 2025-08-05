@@ -32,116 +32,119 @@ SELECCIONANDO = 11
 # --- SISTEMA ANTISPAM MEJORADO ---
 
 # Palabras clave de spam (en minúsculas) - VERSIÓN MEJORADA
-PALABRAS CLAVE_SPAM = [[
- # Criptomonedas/Casino# Cripto/Casino
-    'eth libre', 'Ethereum gratis', 'jetacas', 'casino', 'bonificación', 'código promocional', 
-    'bienvenido1k', 'lanzamiento aéreo', 'cripto', 'cartera', 'btc', 'bitcoin', 'reclamar',
-    'freeether.net', 'eth alerta', 'etéreo', 'bono instantáneo', 'plataforma con licencia',
+PALABRAS_CLAVE_SPAM = [
+    # Criptomonedas/Casino
+    "eth libre", "Ethereum gratis", "jetacas", "casino", "bonificación", "código promocional", 
+    "bienvenido1k", "lanzamiento aéreo", "cripto", "cartera", "btc", "bitcoin", "reclamar",
+    "freeether.net", "eth alerta", "etéreo", "bono instantáneo", "plataforma con licencia",
+    "juego", "apuesta", "ganar", "retirar", "depósito", "tragaperras", "póker", "ruleta",
+    "blackjack", "bingo", "lotería", "jackpot", "premios", "giros gratis", "registro",
+    "verificación", "sin identificación", "instantáneo", "24/7 soporte", "mínimo depósito",
+    "pagos justos", "retiros rápidos", "seguro", "tarjetas", "cripto", "e-wallets",
+    "live casino", "online casino", "online gambling", "online betting", "slots", "poker", "roulette",
+    "free spins", "welcome bonus", "deposit bonus", "no strings attached", "no id required",
+    "instant bonus activation", "top-tier providers", "licensed platform", "fair payouts",
     
     # Términos financieros sospechosos
-    'ganar dinero', 'ganar dinero', 'dinero gratis', 'dinero fácil', 'ingresos pasivos',
-    'inversión', 'ganancia', 'roi', 'comercio', 'forex', 'binario', 'lotería',
-    'ganador', 'premio', 'recompensa', 'regalo', 'sin tarifas', 'libre de riesgos', 'garantizado',
+    "ganar dinero", "ganar dinero", "dinero gratis", "dinero fácil", "ingresos pasivos",
+    "inversión", "ganancia", "roi", "comercio", "forex", "binario", "lotería",
+    "ganador", "premio", "recompensa", "regalo", "sin tarifas", "libre de riesgos", "garantizado",
     
     # Llamadas a la acción urgentes
-    'haga clic aquí', 'visitar', 'regístrate ahora', 'registrarse', 'actúa ahora', 'fecha prisa',
-    'tiempo limitado', 'no te lo pierdas\', 'exclusivo', 'secreto', 'instante',
-    'por tiempo limitado', 'no dura para siempre', 'lanzamiento aire limitado', 'reclama ahora',
+    "haga clic aquí", "visitar", "regístrate ahora", "registrarse", "actúa ahora", "fecha prisa",
+    "tiempo limitado", "no te lo pierdas", "exclusivo", "secreto", "instante",
+    "por tiempo limitado", "no dura para siempre", "lanzamiento aire limitado", "reclama ahora",
     
     # URLs y entrelaza sospechosos 
-    'www.', 'http', '.com', '.net', 'telegrama.yo', 't.me', 'enlace', 'url',
+    "www.", "http", ".com", ".net", "telegrama.yo", "t.me", "enlace", "url",
     
     # Términos de marketing agresivo
-    'oferta', 'trato', 'trabajar desde casa', 'mlm', 'pirámide', 'Soporte 24 horas al día, 7 días a la semana',
-    'depósito mío', 'retiros', 'tarjetas', 'cripto', 'carteras eléctricas',
-    'se requiere verificación', 'sin condiciones', 'implementar registro',
-    'conecta tu billetera', 'verificar', 'el equilibrio cree'
+    "oferta", "trato", "trabajar desde casa", "mlm", "pirámide", "Soporte 24 horas al día, 7 días a la semana",
+    "depósito mío", "retiros", "tarjetas", "cripto", "carteras eléctricas",
+    "se requiere verificación", "sin condiciones", "implementar registro",
+    "conecta tu billetera", "verificar", "el equilibrio cree"
 ]
 
 # URLs sospechosas - VERSIÓN MEJORADA
 SPAM_URLS = [
-    'jetacas.com', 'freeether.net', 'freecrypto', 'lanzamiento aéreo', 'reclamar dinero', 
-    'gana', 'bitcoins de Pecar', 'cryptogift', 'freetokens', 'casino',
-    'bonificación', 'promoción', 'reclamar', 'gratis', 'ganar', 'dinero'
+    "jetacas.com", "freeether.net", "freecrypto", "lanzamiento aéreo", "reclamar dinero", 
+    "gana", "bitcoins de Pecar", "cryptogift", "freetokens", "casino",
+    "bonificación", "promoción", "reclamar", "gratis", "ganar", "dinero",
+    "jetacas.com", "freeether.net", "onlinecasino.com", "gamblingsite.net", "bettingplatform.org"
 ]
 
 # Patrones de emojis sospechosos
 PATRÓN_EMOJI_SPAM = [
-    '🚨', '💰', '🔥', '🔑', '📥', '🔒', '⚡️', '🎮', '🕐', '💵', 
-    '✅', '💳', '🤑', '⚡️', '⏳', '👉', '🟢'
+    "🚨", "💰", "🔥", "🔑", "📥", "🔒", "⚡️", "🎮", "🕐", "💵", 
+    "✅", "💳", "🤑", "⚡️", "⏳", "👉", "🟢", "🎰", "🎲", "👑", "💎"
 ]
 
-importar re
+import re
 
 def es_mensaje_spam(texto: str) -> bool:
     """Detecta si un mensaje es spam - VERSIÓN SUPER MEJORADA"""
- si no hay texto:
- retorno Falso
+    if not texto:
+        return False
     
- texto_inferior = texto.inferior()
+    texto_inferior = texto.lower()
     
     # 1. Palabras clave con regex (coincidencia exacta de palabras)
- encuentro_spam = 0
- para palabra clave en SPAM_PALABRAS CLAVE:
- si re.buscar(rf'\b{re.escapar(palabra clave)}\b', texto_inferior):
- recuento_spam += 1
+    recuento_spam = 0
+    for palabra_clave in PALABRAS_CLAVE_SPAM:
+        if re.search(rf"\b{re.escape(palabra_clave)}\b", texto_inferior):
+            recuento_spam += 1
     
     # 2. URL con expresiones regulares
- url_pattern = re.buscar(
-        r'(jetacas\.com|freeether\.net|t\.me|telegram\.me)',
- texto_inferior
+    url_spam = False
+    for url in SPAM_URLS:
+        if url in texto_inferior:
+            url_spam = True
+            break
+    
+    # 3. Nombres específicos de casinos y términos relacionados
+    nombres_casino = ["jetacas", "casino", "online casino", "online gambling", "online betting", "freeether.net"]
+    tiene_nombre_casino = any(re.search(rf"\b{nombre}\b", texto_inferior) for nombre in nombres_casino)
+    
+    # 4. Patrones de spam de casino específicos
+    patron_casino_especifico = re.search(
+        r"(\b(?:jetacas|casino|online casino|online gambling|online betting)\b.*(?:bonus|promo|free spins|launch bonus)|\$1000.*bonus.*promo|\b(?:no id|no verification) required)",
+        texto_inferior
     )
     
-    # 3. Nombres específicos de casinos
- nombres_casino = ['jetacas', 'éter libre']
- tiene_nombre_casino = cualiera(re.buscar(rf'\b{nombre}\b', texto_inferior) para nombre en nombres_casino)
-    
-    # 4. Patrones de spam de casino
- patrón_casino = re.buscar(
-        r'(\b(?:jetacas|casino)\b.*bonus.*promo|\$1000.*bonus.*promo)',
- texto_inferior
+    # 5. Combinación de elementos (emojis + palabras clave de casino/bono + URL)
+    has_spam_combo = (
+        sum(1 for emoji in PATRÓN_EMOJI_SPAM if emoji in texto) >= 2 and # Al menos 2 emojis sospechosos
+        any(palabra_clave in texto_inferior for palabra_clave in ["casino", "bonificación", "promoción", "jetacas", "bonus", "promo code"]) and
+        ("jetacas.com" in texto_inferior or "t.me" in texto_inferior or "telegram.me" in texto_inferior or "http" in texto_inferior)
     )
     
-    # 5. Combinación sostenida de elementos
- has_spam_combo = (
-        cualiera(emoji en texto para emoji en PATRONES_EMOJI_SPAM) y
- cualiera(palabra clave en texto_inferior para palabra clave en ['casino', 'bonificación', 'promoción']) y
-        ('.com' en texto_inferior o 't.me' en texto_inferior)
-    )
+    # 6. Estructura de spam (múltiples líneas con emojis)
+    lineas = texto.split('\n')
+    lineas_emoji = sum(1 for linea in lineas if any(emoji in linea for emoji in PATRÓN_EMOJI_SPAM))
+    tiene_estructura_spam = lineas_emoji >= 4
     
- # 6. Estructura física de spam (múltiples líneas con emojis)
- líneas = texto.dividir('\n')
- líneas_emoji = suma(1 para línea en líneas si cualiera(emoji en línea para emoji en PATRONES_EMOJI_SPAM))
- has_spam_structure = emoji_lines >= 4
+    # 7. Verificar longitud excesiva (spam típico es muy largo)
+    es_demasiado_largo = len(texto) > 250 # Ajustado a 250 para ser más sensible
     
- # Condiciones de detección (más restricciones)
- retorno (
- recuento_spam >= 2 o
- url_patrón es no Ninguno o
- has_casino_nombre o
- patrón_casino es no Ninguno o
- has_spam_combo o
- (tiene_estructura_spam y retorno_spam >= 1)
-)
-    
- # 7. Verificar longitud excesiva (spam típico es muy largo)
- es_demosiado_largo = len(texto) > 500
-    
- # 8. Detectar múltiples líneas con emojis (estructura de spam)
- líneas_con_emojis = suma(1 para línea en texto.dividir('\n') si cualiera(emoji en línea para emoji en PATRONES_EMOJI_SPAM))
- has_spam_structure = líneas_con_emojis >= 4
-    
- # Mensaje es spam si cumple cualera de estos criterios:
- regresar (
- encuentro_spam >= 2 o # Reducido de 3 a 2 para mayor sensibilidad
- url_spam o 
- tiene_nombre_casino o
- estructura_casino o 
- cripto_estructura o
- (tiene_emojis_excesivos y tiene_idioma_urgente) o 
- (tiene_caps_sospechosos y encuentro_spam >= 1) o
- (es_demosiado_largo y encuentro_spam >= 1) o
- tiene_estructura_spam
+    # 8. Detección de mayúsculas excesivas (indicador de spam)
+    mayusculas_count = sum(1 for char in texto if char.isupper())
+    total_letras = sum(1 for char in texto if char.isalpha())
+    tiene_caps_sospechosos = False
+    if total_letras > 0:
+        porcentaje_mayusculas = (mayusculas_count / total_letras) * 100
+        if porcentaje_mayusculas > 50 and len(texto) > 50: # Más del 50% de mayúsculas en mensajes largos
+            tiene_caps_sospechosos = True
+
+    # Condiciones de detección (más restricciones)
+    return (
+        recuento_spam >= 3 or # Aumentado a 3 para mayor precisión
+        url_spam or 
+        tiene_nombre_casino or
+        patron_casino_especifico is not None or 
+        has_spam_combo or
+        (tiene_estructura_spam and recuento_spam >= 1) or
+        (es_demasiado_largo and recuento_spam >= 1) or
+        tiene_caps_sospechosos
     )
 
 
