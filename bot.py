@@ -1,136 +1,153 @@
-import os
-import asyncio
-import httpx
-import random
-import logging
-import requests
-logging.basicConfig(level=logging.INFO)
-from dotenv import load_dotenv
-from telegram import Update, ChatMember
-from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes, MessageHandler, filters, ConversationHandler
+importarimportar sistema operativo
+importarimportar asyncio
+importarimportar httpx
+importarimportar aleatorio
+importarimportar registro
+importsolicitudes de importación
+registro.configuración básica(nivel=registro.INFORMACIÓN)configuración básica(nivel=registro.INFORMACIÓN)
+desdede dotenv importar load_dotenvimportar load_dotenv
+desdede telegram importar Actualización, ChatMemberimport Update, ChatMember
+telegrama dede.ext importar ApplicationBuilder, CommandHandler, ContextTypes, MessageHandler, filtros, ConversationHandlerimportar ApplicationBuilder, CommandHandler, ContextTypes, MessageHandler, filtros, ConversationHandler
 
 # Cargar variables de entorno
-load_dotenv()
+carga_punto()
 
 # --- Configuración y Constantes ---
-logging.basicConfig(
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    level=logging.INFO
+registro.configuración básica(configuración básica(
+ formato='%(asctime)s - %(nombre)s - %(nombre de nivel)s - %(mensaje)s','%(asctime)s - %(nombre)s - %(nombre de nivel)s - %(mensaje)s',
+ nivel=registro.INFORMACIÓNINFO
 )
-logger = logging.getLogger(__name__)
+registrador = registro.getLogger(__nombre__)getLogger(__nombre__)
 
-BOT_TOKEN = os.getenv("BOT_TOKEN")
-TMDB_API_KEY = os.getenv("TMDB_API_KEY")
-OMDB_API_KEY = os.getenv("OMDB_API_KEY") # Movido aquí para consistencia
-CHAT_ID = -1002700094661
+BOT_TOKEN = sistema operativo.getenv("BOT_TOKEN")getenv("BOT_TOKEN")
+TMDB_API_KEY = sistema operativo.getenv(„TMDB_API_KEY")getenv(„TMDB_API_KEY")
+OMDB_API_KEY = sistema operativo.getenv("CLAVE_API_OMDB") # Movido aquí para consistenciagetenv("OMDB_API_KEY") # Movido aquí para consistencia
+CHAT_ID = -10027000946611002700094661
 
-SIGNATURE = "\n\n💻ANDY (el+lin2)🛠️🪛 📍Ave 3️⃣7️⃣ - #️⃣4️⃣2️⃣1️⃣1️⃣ ➗4️⃣2️⃣ y 4️⃣8️⃣ cerca del CVD 🏟️ 📌MAYABEQUE SAN JOSÉ"
+FIRME = "\n\n💻ANDY (el+lin2)🛠️🪛 📍Ave 3️⃣7️⃣ - #️⃣4️⃣2️⃣1️⃣1️⃣ ➗4️⃣2️⃣ y 4️⃣8️⃣ cerca del CVD 🏟️ 📌MAYABEQUE SAN JOSÉ""\n\n💻ANDY (el+lin2)🛠️🪛 📍Ave 3️⃣7️⃣ - #️⃣4️⃣2️⃣1️⃣1️⃣ ➗4️⃣2️⃣ y 4️⃣8️⃣ cerca del CVD 🏟️ 📌MAYABEQUE SAN JOSÉ"
 
 # Estados de la conversación
-SELECTING = 1
+SELECCIONANDO = 11
 
-# --- SISTEMA ANTI-SPAM MEJORADO ---
+# --- SISTEMA ANTISPAM MEJORADO ---
 
 # Palabras clave de spam (en minúsculas) - VERSIÓN MEJORADA
-SPAM_KEYWORDS = [
-    # Crypto/Casino
-    'free eth', 'free ethereum', 'jetacas', 'casino', 'bonus', 'promo code', 
-    'welcome1k', 'airdrop', 'crypto', 'wallet', 'btc', 'bitcoin', 'claim',
-    'freeether.net', 'eth alert', 'ethereum', 'instant bonus', 'licensed platform',
+PALABRAS CLAVE_SPAM = [[
+ # Criptomonedas/Casino# Cripto/Casino
+    'eth libre', 'Ethereum gratis', 'jetacas', 'casino', 'bonificación', 'código promocional', 
+    'bienvenido1k', 'lanzamiento aéreo', 'cripto', 'cartera', 'btc', 'bitcoin', 'reclamar',
+    'freeether.net', 'eth alerta', 'etéreo', 'bono instantáneo', 'plataforma con licencia',
     
     # Términos financieros sospechosos
-    'earn money', 'make money', 'free money', 'easy money', 'passive income',
-    'investment', 'profit', 'roi', 'trading', 'forex', 'binary', 'lottery',
-    'winner', 'prize', 'reward', 'gift', 'no fees', 'risk free', 'guaranteed',
+    'ganar dinero', 'ganar dinero', 'dinero gratis', 'dinero fácil', 'ingresos pasivos',
+    'inversión', 'ganancia', 'roi', 'comercio', 'forex', 'binario', 'lotería',
+    'ganador', 'premio', 'recompensa', 'regalo', 'sin tarifas', 'libre de riesgos', 'garantizado',
     
     # Llamadas a la acción urgentes
-    'click here', 'visit', 'register now', 'sign up', 'act now', 'hurry',
-    'limited time', 'don\'t miss', 'exclusive', 'secret', 'instant',
-    'time-limited', 'won\'t last forever', 'limited airdrop', 'claim now',
+    'haga clic aquí', 'visitar', 'regístrate ahora', 'registrarse', 'actúa ahora', 'fecha prisa',
+    'tiempo limitado', 'no te lo pierdas\', 'exclusivo', 'secreto', 'instante',
+    'por tiempo limitado', 'no dura para siempre', 'lanzamiento aire limitado', 'reclama ahora',
     
-    # URLs y enlaces sospechosos  
-    'www.', 'http', '.com', '.net', 'telegram.me', 't.me', 'link', 'url',
+    # URLs y entrelaza sospechosos 
+    'www.', 'http', '.com', '.net', 'telegrama.yo', 't.me', 'enlace', 'url',
     
     # Términos de marketing agresivo
-    'offer', 'deal', 'work from home', 'mlm', 'pyramid', '24/7 support',
-    'minimum deposit', 'withdrawals', 'cards', 'crypto', 'e-wallets',
-    'verification required', 'no strings attached', 'just register',
-    'connect your wallet', 'verify', 'balance grow'
+    'oferta', 'trato', 'trabajar desde casa', 'mlm', 'pirámide', 'Soporte 24 horas al día, 7 días a la semana',
+    'depósito mío', 'retiros', 'tarjetas', 'cripto', 'carteras eléctricas',
+    'se requiere verificación', 'sin condiciones', 'implementar registro',
+    'conecta tu billetera', 'verificar', 'el equilibrio cree'
 ]
 
 # URLs sospechosas - VERSIÓN MEJORADA
 SPAM_URLS = [
-    'jetacas.com', 'freeether.net', 'freecrypto', 'airdrop', 'claimmoney', 
-    'earneth', 'bitcoinfree', 'cryptogift', 'freetokens', 'casino',
-    'bonus', 'promo', 'claim', 'free', 'earn', 'money'
+    'jetacas.com', 'freeether.net', 'freecrypto', 'lanzamiento aéreo', 'reclamar dinero', 
+    'gana', 'bitcoins de Pecar', 'cryptogift', 'freetokens', 'casino',
+    'bonificación', 'promoción', 'reclamar', 'gratis', 'ganar', 'dinero'
 ]
 
 # Patrones de emojis sospechosos
-SPAM_EMOJI_PATTERNS = [
+PATRÓN_EMOJI_SPAM = [
     '🚨', '💰', '🔥', '🔑', '📥', '🔒', '⚡️', '🎮', '🕐', '💵', 
     '✅', '💳', '🤑', '⚡️', '⏳', '👉', '🟢'
 ]
 
-def is_spam_message(text: str) -> bool:
-    """Detecta si un mensaje es spam - VERSIÓN MEJORADA"""
-    if not text:
-        return False
+importar re
+
+def es_mensaje_spam(texto: str) -> bool:
+    """Detecta si un mensaje es spam - VERSIÓN SUPER MEJORADA"""
+ si no hay texto:
+ retorno Falso
     
-    text_lower = text.lower()
+ texto_inferior = texto.inferior()
     
-    # 1. Verificar palabras clave de spam (umbral más bajo)
-    spam_count = sum(1 for keyword in SPAM_KEYWORDS if keyword in text_lower)
+    # 1. Palabras clave con regex (coincidencia exacta de palabras)
+ encuentro_spam = 0
+ para palabra clave en SPAM_PALABRAS CLAVE:
+ si re.buscar(rf'\b{re.escapar(palabra clave)}\b', texto_inferior):
+ recuento_spam += 1
     
-    # 2. Verificar URLs sospechosas
-    url_spam = any(url in text_lower for url in SPAM_URLS)
-    
-    # 3. Detectar nombres específicos de casinos/scams
-    casino_names = ['jetacas', 'freeether']
-    has_casino_name = any(name in text_lower for name in casino_names)
-    
-    # 4. Detectar patrones de spam
-    has_excessive_emojis = sum(text.count(emoji) for emoji in SPAM_EMOJI_PATTERNS) >= 5
-    has_urgent_language = any(word in text_lower for word in ['alert!', 'hurry!', 'limited!', 'now!', 'act now'])
-    has_suspicious_caps = sum(1 for c in text if c.isupper()) > len(text) * 0.25
-    
-    # 5. Detectar estructura típica de spam de casino
-    casino_structure = (
-        'bonus' in text_lower and 
-        'promo' in text_lower and
-        ('$' in text or '💰' in text)
+    # 2. URL con expresiones regulares
+ url_pattern = re.buscar(
+        r'(jetacas\.com|freeether\.net|t\.me|telegram\.me)',
+ texto_inferior
     )
     
-    # 6. Detectar estructura típica de crypto spam
-    crypto_structure = (
-        'free' in text_lower and 
-        'eth' in text_lower and
-        ('wallet' in text_lower or 'claim' in text_lower)
+    # 3. Nombres específicos de casinos
+ nombres_casino = ['jetacas', 'éter libre']
+ tiene_nombre_casino = cualiera(re.buscar(rf'\b{nombre}\b', texto_inferior) para nombre en nombres_casino)
+    
+    # 4. Patrones de spam de casino
+ patrón_casino = re.buscar(
+        r'(\b(?:jetacas|casino)\b.*bonus.*promo|\$1000.*bonus.*promo)',
+ texto_inferior
     )
     
-    # 7. Verificar longitud excesiva (spam típico es muy largo)
-    is_too_long = len(text) > 500
+    # 5. Combinación sostenida de elementos
+ has_spam_combo = (
+        cualiera(emoji en texto para emoji en PATRONES_EMOJI_SPAM) y
+ cualiera(palabra clave en texto_inferior para palabra clave en ['casino', 'bonificación', 'promoción']) y
+        ('.com' en texto_inferior o 't.me' en texto_inferior)
+    )
     
-    # 8. Detectar múltiples líneas con emojis (estructura de spam)
-    lines_with_emojis = sum(1 for line in text.split('\n') if any(emoji in line for emoji in SPAM_EMOJI_PATTERNS))
-    has_spam_structure = lines_with_emojis >= 4
+ # 6. Estructura física de spam (múltiples líneas con emojis)
+ líneas = texto.dividir('\n')
+ líneas_emoji = suma(1 para línea en líneas si cualiera(emoji en línea para emoji en PATRONES_EMOJI_SPAM))
+ has_spam_structure = emoji_lines >= 4
     
-    # Mensaje es spam si cumple cualquiera de estos criterios:
-    return (
-        spam_count >= 2 or  # Reducido de 3 a 2 para mayor sensibilidad
-        url_spam or 
-        has_casino_name or
-        casino_structure or 
-        crypto_structure or
-        (has_excessive_emojis and has_urgent_language) or 
-        (has_suspicious_caps and spam_count >= 1) or
-        (is_too_long and spam_count >= 1) or
-        has_spam_structure
+ # Condiciones de detección (más restricciones)
+ retorno (
+ recuento_spam >= 2 o
+ url_patrón es no Ninguno o
+ has_casino_nombre o
+ patrón_casino es no Ninguno o
+ has_spam_combo o
+ (tiene_estructura_spam y retorno_spam >= 1)
+)
+    
+ # 7. Verificar longitud excesiva (spam típico es muy largo)
+ es_demosiado_largo = len(texto) > 500
+    
+ # 8. Detectar múltiples líneas con emojis (estructura de spam)
+ líneas_con_emojis = suma(1 para línea en texto.dividir('\n') si cualiera(emoji en línea para emoji en PATRONES_EMOJI_SPAM))
+ has_spam_structure = líneas_con_emojis >= 4
+    
+ # Mensaje es spam si cumple cualera de estos criterios:
+ regresar (
+ encuentro_spam >= 2 o # Reducido de 3 a 2 para mayor sensibilidad
+ url_spam o 
+ tiene_nombre_casino o
+ estructura_casino o 
+ cripto_estructura o
+ (tiene_emojis_excesivos y tiene_idioma_urgente) o 
+ (tiene_caps_sospechosos y encuentro_spam >= 1) o
+ (es_demosiado_largo y encuentro_spam >= 1) o
+ tiene_estructura_spam
     )
 
 
 # --- Diccionarios de Emojis ---
 
-genre_emojis_dict = {
+genero_emojis_dict = {
     'Acción': '🔥', 'Aventura': '🗺️', 'Animación': '🎨', 'Comedia': '😂',
     'Crimen': '🕵️', 'Documental': '🎥', 'Drama': '🎭', 'Familia': '👨‍👩‍👧‍👦',
     'Fantasía': '🧚', 'Historia': '📜', 'Terror': '👻', 'Música': '🎵',
