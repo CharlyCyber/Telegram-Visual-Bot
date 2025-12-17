@@ -6,8 +6,9 @@ echo "🚀 Iniciando Bot de Telegram Anti-Spam..."
 # Instalar dependencias
 pip install -r requirements.txt
 
-# Crear directorio para logs
-mkdir -p /var/log/supervisor
+# Crear directorios para logs (dentro del proyecto)
+mkdir -p ./logs
+mkdir -p ./run
 
 echo "✅ Dependencias instaladas"
 
@@ -17,5 +18,5 @@ supervisord -c supervisord.conf
 
 echo "🎯 Bot iniciado correctamente"
 
-# Mantener el proceso vivo
-tail -f /var/log/supervisor/telegram_bot.log
+# Mantener el proceso vivo mostrando logs
+tail -f ./logs/telegram_bot.log
