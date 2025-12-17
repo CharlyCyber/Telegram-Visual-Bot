@@ -4,12 +4,29 @@ import httpx
 import random
 import logging
 import requests
+import threading
+from flask import Flask
 from dotenv import load_dotenv
 from telegram import Update, ChatMember
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes, MessageHandler, filters, ConversationHandler
 
 # Cargar variables de entorno
 load_dotenv()
+
+# --- Servidor Web para Render ---
+flask_app = Flask(__name__)
+
+@flask_app.route('/')
+def home():
+    return '🤖 Bot de Telegram activo!'
+
+@flask_app.route('/health')
+def health():
+    return 'OK', 200
+
+def run_flask():
+    port = int(os.environ.get('PORT', 10000))
+    flask_app.run(host='0.0.0.0', port=port)
 
 # --- Configuración y Constantes ---
 logging.basicConfig(
@@ -775,6 +792,11 @@ def main() -> None:
             "Faltan variables de entorno críticas (BOT_TOKEN, TMDB_API_KEY). El bot no puede iniciar."
         )
         return
+
+    # Iniciar servidor Flask en un hilo separado
+    flask_thread = threading.Thread(target=run_flask, daemon=True)
+    flask_thread.start()
+    logger.info("Servidor web iniciado...")
 
     app = ApplicationBuilder().token(BOT_TOKEN).build()
 
