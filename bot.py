@@ -40,7 +40,7 @@ TMDB_API_KEY = os.getenv("TMDB_API_KEY")
 OMDB_API_KEY = os.getenv("OMDB_API_KEY")  # Movido aquí para consistencia
 CHAT_ID = -1002700094661
 
-FIRME = "\n\n💻ANDY (el+lin2)🛠️🪛 📍Ave 3️⃣7️⃣ - #️⃣4️⃣2️⃣1️⃣1️⃣ ➗4️⃣2️⃣ y 4️⃣8️⃣ cerca del CVD 🏟️ 📌MAYABEQUE SAN JOSÉ"
+FIRME = ""
 
 # Estados de la conversación
 SELECCIONANDO = 11
@@ -313,53 +313,27 @@ genero_emojis_dict = {
 }
 
 title_keyword_emojis = {
-    'luna': '🌙',
-    'espacio': '🚀',
-    'estrella': '⭐',
-    'mar': '🌊',
-    'amor': '❤️',
-    'avión': '✈️',
-    'fuego': '🔥',
-    'guerra': '⚔️',
-    'robot': '🤖',
-    'fantasma': '👻',
-    'música': '🎵',
-    'superhéroe': '🦸',
-    'deporte': '🏅',
-    'misterio': '🕵️',
-    'terror': '👻',
-    'comedia': '😂',
-    'drama': '🎭',
-    'historia': '📜',
-    'fantasía': '🧚',
-    'familia': '👨‍👩‍👧‍👦',
+    'luna': '🌙', 'espacio': '🚀', 'estrella': '⭐', 'mar': '🌊', 'amor': '❤️',
+    'avión': '✈️', 'fuego': '🔥', 'guerra': '⚔️', 'robot': '🤖', 'fantasma': '👻',
+    'música': '🎵', 'superhéroe': '🦸', 'deporte': '🏅', 'misterio': '🕵️',
+    'terror': '👻', 'comedia': '😂', 'drama': '🎭', 'historia': '📜',
+    'fantasía': '🧚', 'familia': '👨‍👩‍👧‍👦', 'dragón': '🐉', 'magia': '✨',
+    'aventura': '🗺️', 'crimen': '🕵️‍♂️', 'suspenso': '😱', 'animación': '🎨',
+    'perro': '🐶', 'gato': '🐱', 'viaje': '✈️', 'tiempo': '⏳', 'muerte': '💀',
+    'vida': '🌱', 'mundo': '🌍', 'batalla': '⚔️', 'poder': '⚡', 'secreto': '🤫'
 }
 
 synopsis_keyword_emojis = {
-    'asesino': '🔪',
-    'misterio': '🕵️',
-    'amor': '❤️',
-    'guerra': '⚔️',
-    'espacio': '🚀',
-    'luna': '🌙',
-    'robot': '🤖',
-    'futuro': '🔮',
-    'ballet': '🩰',
-    'familia': '👨‍👩‍👧‍👦',
-    'venganza': '😠',
-    'crimen': '🕵️',
-    'viaje': '✈️',
-    'mar': '🌊',
-    'monstruo': '👹',
-    'música': '🎵',
-    'superhéroe': '🦸',
-    'magia': '✨',
-    'batalla': '⚔️',
-    'sueño': '💤',
-    'dinero': '💰',
-    'rescate': '🆘',
-    'explosión': '💥',
-    'coche': '🚗',
+    'asesino': '🔪', 'misterio': '🕵️', 'amor': '❤️', 'guerra': '⚔️', 'espacio': '🚀',
+    'luna': '🌙', 'robot': '🤖', 'futuro': '🔮', 'ballet': '🩰', 'familia': '👨‍👩‍👧‍👦',
+    'venganza': '😠', 'crimen': '🕵️', 'viaje': '✈️', 'mar': '🌊', 'monstruo': '👹',
+    'música': '🎵', 'superhéroe': '🦸', 'magia': '✨', 'batalla': '⚔️', 'sueño': '💤',
+    'dinero': '💰', 'rescate': '🆘', 'explosión': '💥', 'coche': '🚗', 'dragón': '🐉',
+    'fuego': '🔥', 'espada': '⚔️', 'reino': '🏰', 'bosque': '🌲', 'ciudad': '🏙️',
+    'policía': '👮', 'detective': '🕵️‍♂️', 'prisión': '⛓️', 'huida': '🏃',
+    'secreto': '🤫', 'traición': '🐍', 'amistad': '🤝', 'escuela': '🏫',
+    'universidad': '🎓', 'tecnología': '💻', 'virus': '🦠', 'zombie': '🧟',
+    'alienígena': '👽', 'planeta': '🪐', 'tiempo': '⏳', 'pasado': '🕰️'
 }
 
 # --- Funciones de Formato de Texto ---
@@ -382,35 +356,13 @@ def get_synopsis_with_emojis(synopsis):
     for keyword, emoji in synopsis_keyword_emojis.items():
         if keyword in synopsis_lower and emoji not in found_emojis:
             found_emojis.add(emoji)
-            if len(found_emojis) >= 3:
+            if len(found_emojis) >= 5: # Aumentado a 5
                 break
     return f"{synopsis} {' '.join(found_emojis)}" if found_emojis else synopsis
 
 
 def get_dynamic_closing(synopsis):
-    s = synopsis.lower()
-    if any(x in s for x in ['misterio', 'secreto']):
-        return "¡Una historia de misterio! 🕵️‍♂️"
-    if any(x in s for x in ['aventura', 'viaje']):
-        return "¡Sumérgete en esta aventura única! 🗺️"
-    if any(x in s for x in ['acción', 'batalla']):
-        return "¡Prepárate para la acción! 🔥"
-    if any(x in s for x in ['amor', 'romance']):
-        return "¡Déjate llevar por esta historia de amor! ❤️"
-    if any(x in s for x in ['familia', 'hermano', 'padre']):
-        return "¡Una historia que celebra la familia! 👨‍👩‍👧‍👦"
-    if any(x in s for x in ['espacio', 'planeta']):
-        return "¡Viaja más allá de las estrellas! 🌌"
-    if any(x in s for x in ['terror', 'miedo']):
-        return "¡Prepárate a sentir el terror! 👻"
-    if any(x in s for x in ['música', 'canción']):
-        return "¡Déjate llevar por la música! 🎵"
-    if any(x in s for x in ['magia', 'fantasía']):
-        return "¡Descubre un mundo de magia! ✨"
-    return random.choice([
-        "¡No te pierdas esta emocionante historia! 🚀",
-        "¡Una experiencia que no olvidarás! ⭐"
-    ])
+    return "🤖 Automatización creada por Charli AI, ofrecemos servicios generales de IA 🚀✨"
 
 
 # --- Funciones de Búsqueda en APIs (Refactorizadas a async) ---
@@ -491,8 +443,6 @@ async def search_omdb(query: str):
             caption_parts.append(f"\n🎬 <b>Director:</b> {director}")
         if actors and actors != 'N/A':
             caption_parts.append(f"\n🎭 <b>Reparto:</b> {actors}")
-        if runtime and runtime != 'N/A':
-            caption_parts.append(f"\n🕒 <b>Duración:</b> {runtime}")
         if genre and genre != 'N/A':
             caption_parts.append(f"\n🎞️ <b>Géneros:</b> {genre}")
         if rating and rating != 'N/A':
@@ -613,7 +563,6 @@ async def publish_tmdb_item(update: Update,
                 f"\n📝 <b>Sinopsis:</b>\n{get_synopsis_with_emojis(overview)}")
         if cast: lines.append(f"\n🎭 <b>Reparto:</b> {cast}")
         if director: lines.append(f"\n🎬 <b>Dirección:</b> {director}")
-        if runtime: lines.append(f"\n🕒 <b>Duración:</b> {runtime}")
         if release_date: lines.append(f"\n📅 <b>Estreno:</b> {release_date}")
         if vote_average:
             lines.append(f"\n⭐️ <b>Calificación IMDb:</b> {vote_average}/10")
@@ -638,7 +587,6 @@ async def publish_tmdb_item(update: Update,
                     lines.append(f"\n📝 <b>Sinopsis:</b>\n{get_synopsis_with_emojis(truncated_overview)}")
                     if cast: lines.append(f"\n🎭 <b>Reparto:</b> {cast}")
                     if director: lines.append(f"\n🎬 <b>Dirección:</b> {director}")
-                    if runtime: lines.append(f"\n🕒 <b>Duración:</b> {runtime}")
                     if release_date: lines.append(f"\n📅 <b>Estreno:</b> {release_date}")
                     if vote_average: lines.append(f"\n⭐️ <b>Calificación IMDb:</b> {vote_average}/10")
                     if genres: lines.append(f"\n🎞️ <b>Géneros:</b> {', '.join(genres)} {genre_emojis}")
