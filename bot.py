@@ -38,7 +38,7 @@ logger = logging.getLogger(__name__)
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 TMDB_API_KEY = os.getenv("TMDB_API_KEY")
 OMDB_API_KEY = os.getenv("OMDB_API_KEY")  # Movido aquí para consistencia
-CHAT_ID = -2700094661
+CHAT_ID = -1002700094661
 
 FIRME = "\n\n💻ANDY (el+lin2)🛠️🪛 📍Ave 3️⃣7️⃣ - #️⃣4️⃣2️⃣1️⃣1️⃣ ➗4️⃣2️⃣ y 4️⃣8️⃣ cerca del CVD 🏟️ 📌MAYABEQUE SAN JOSÉ"
 
@@ -748,15 +748,15 @@ async def _send_formatted_reply(update: Update, image_url: str | None,
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    print("start llamado"
-          )  # Esto nos ayudará a ver en los logs cuando se llama a start
+    logger.info(f"Comando /start recibido de usuario {update.message.from_user.id}")
     await update.message.reply_text(
         'Envíame el nombre de la película o serie (ejemplo: Inception)')
-    context.user_data.clear()  # Limpiamos cualquier dato previo del usuario
+    context.user_data.clear()
     return ConversationHandler.END
 
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    logger.info(f"handle_message llamado con texto: '{update.message.text}' de usuario {update.message.from_user.id}")
     # FILTRO 1: Verificar si es spam
     if es_mensaje_spam(update.message.text):
         logger.info(
@@ -853,6 +853,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 tipo = '📺 Serie'
             msg += f"{idx}. {title} ({date[:4]}) {tipo}\n"
         await update.message.reply_text(msg)
+        logger.info(f"Cambiando a estado SELECCIONANDO para usuario {update.message.from_user.id}")
         return SELECCIONANDO
 
     # Si solo hay una coincidencia, publicar directamente
@@ -863,6 +864,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def select_option(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    logger.info(f"select_option llamado con texto: '{update.message.text}' de usuario {update.message.from_user.id}")
     # FILTRO: Verificar si el usuario es miembro del grupo
     if not await is_user_in_group(context, update.message.from_user.id):
         logger.info(
