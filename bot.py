@@ -622,10 +622,42 @@ async def publish_tmdb_item(update: Update,
                 f"\n🎞️ <b>Géneros:</b> {', '.join(genres)} {genre_emojis}")
         lines.append(f"\n{get_dynamic_closing(overview)}{FIRME}")
         caption = '\n'.join(lines)
+
+        # --- TRUNCADO DE CAPTION PARA TELEGRAM (Límite 1024 caracteres) ---
+        if poster_url and len(caption) > 1024:
+            logger.warning(f"Caption demasiado larga ({len(caption)} chars). Truncando...")
+            # Intentar reducir la sinopsis primero
+            if overview:
+                max_overview_len = 1024 - (len(caption) - len(overview)) - 10
+                if max_overview_len > 100:
+                    truncated_overview = overview[:max_overview_len] + "..."
+                    # Regenerar caption con sinopsis truncada
+                    lines = []
+                    lines.append(f"{keyword_emojis} {genre_emojis} 🎬 <b>{title} ({release_date[:4] if release_date else 'N/D'})</b> 🎬 {keyword_emojis} {genre_emojis}")
+                    lines.append(f"🎬 Tipo: Película" if is_movie else "📺 Tipo: Serie")
+                    lines.append(f"\n📝 <b>Sinopsis:</b>\n{get_synopsis_with_emojis(truncated_overview)}")
+                    if cast: lines.append(f"\n🎭 <b>Reparto:</b> {cast}")
+                    if director: lines.append(f"\n🎬 <b>Dirección:</b> {director}")
+                    if runtime: lines.append(f"\n🕒 <b>Duración:</b> {runtime}")
+                    if release_date: lines.append(f"\n📅 <b>Estreno:</b> {release_date}")
+                    if vote_average: lines.append(f"\n⭐️ <b>Calificación IMDb:</b> {vote_average}/10")
+                    if genres: lines.append(f"\n🎞️ <b>Géneros:</b> {', '.join(genres)} {genre_emojis}")
+                    lines.append(f"\n{get_dynamic_closing(overview)}{FIRME}")
+                    caption = '\n'.join(lines)
+            
+            # Si aún es demasiado larga, truncar a lo bruto
+            if len(caption) > 1024:
+                caption = caption[:1021] + "..."
+
         if poster_url:
-            await update.message.reply_photo(photo=poster_url,
-                                         caption=caption,
-                                         parse_mode='HTML')
+            try:
+                await update.message.reply_photo(photo=poster_url,
+                                             caption=caption,
+                                             parse_mode='HTML')
+            except Exception as e:
+                logger.error(f"Error enviando foto (posiblemente caption): {e}")
+                # Reintento enviando solo texto si falla la foto con caption
+                await update.message.reply_text(text=caption, parse_mode='HTML')
         else:
             await update.message.reply_text(text=caption,
                                            parse_mode='HTML')
@@ -825,9 +857,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # Si solo hay una coincidencia, publicar directamente
     item = combined[0]
-    is_movie = item['__type'] == 'movie'
-    year = item.get('release_date', '')[:4] if is_movie else item.get(
-        'first_air_date', '')[:4]
+    is_movie = item.get('__type') == 'movie'
+    year = (item.get('release_date') or item.get('first_air_date') or '')[:4]
     await publish_tmdb_item(update, context, item, is_movie, year)
 
 
@@ -848,8 +879,7 @@ async def select_option(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return SELECCIONANDO
         item = options[idx]
         is_movie = item.get('__type') == 'movie'
-        year = item.get('release_date', '')[:4] if is_movie else item.get(
-            'first_air_date', '')[:4]
+        year = (item.get('release_date') or item.get('first_air_date') or '')[:4]
         await publish_tmdb_item(update, context, item, is_movie, year)
         context.user_data.clear()
         return ConversationHandler.END
