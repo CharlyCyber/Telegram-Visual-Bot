@@ -40,7 +40,7 @@ TMDB_API_KEY = os.getenv("TMDB_API_KEY")
 OMDB_API_KEY = os.getenv("OMDB_API_KEY")  # Movido aquí para consistencia
 CHAT_ID = -1002700094661
 
-FIRME = ""
+FIRME = "\n\n💻ANDY (el+lin2)🛠️🪛 📍Ave 3️⃣7️⃣ - #️⃣4️⃣2️⃣1️⃣1️⃣ ➗4️⃣2️⃣ y 4️⃣8️⃣ cerca del CVD 🏟️ 📌MAYABEQUE SAN JOSÉ"
 
 # Estados de la conversación
 SELECCIONANDO = 11
@@ -352,13 +352,30 @@ def get_synopsis_with_emojis(synopsis):
     if not synopsis:
         return ''
     synopsis_lower = synopsis.lower()
-    found_emojis = set()
+    found_emojis = []
     for keyword, emoji in synopsis_keyword_emojis.items():
         if keyword in synopsis_lower and emoji not in found_emojis:
-            found_emojis.add(emoji)
-            if len(found_emojis) >= 5: # Aumentado a 5
+            found_emojis.append(emoji)
+            if len(found_emojis) >= 8: # Aumentado para mejor distribución
                 break
-    return f"{synopsis} {' '.join(found_emojis)}" if found_emojis else synopsis
+    
+    if not found_emojis:
+        return synopsis
+
+    # Distribuir emojis: inicio, medio y fin
+    n = len(found_emojis)
+    start_emojis = ' '.join(found_emojis[:n//3])
+    mid_emojis = ' '.join(found_emojis[n//3:2*n//3])
+    end_emojis = ' '.join(found_emojis[2*n//3:])
+
+    # Insertar en el medio (aproximadamente)
+    mid_point = len(synopsis) // 2
+    # Buscar el espacio más cercano para no romper palabras
+    space_idx = synopsis.find(' ', mid_point)
+    if space_idx == -1: space_idx = mid_point
+
+    result = f"{start_emojis} {synopsis[:space_idx]} {mid_emojis} {synopsis[space_idx:]} {end_emojis}"
+    return result.strip()
 
 
 def get_dynamic_closing(synopsis):
