@@ -575,26 +575,34 @@ async def publish_tmdb_item(update: Update,
             r = await client.get(details_url)
             details = r.json()
 
-        overview = details.get('overview', '')
-        genres = [g['name'] for g in details.get('genres', [])]
+        overview = details.get('overview') or ''
+        genres_raw = details.get('genres') or []
+        genres = [g['name'] for g in genres_raw if g and 'name' in g]
         genre_emojis = get_genre_emojis(genres)
         keyword_emojis = get_keyword_emojis(title)
         poster_path = details.get('poster_path')
         poster_url = f'https://image.tmdb.org/t/p/original{poster_path}' if poster_path else None
         release_date = details.get('release_date') or details.get(
-            'first_air_date', '')
-        runtime = details.get('runtime') or (details.get(
-            'episode_run_time', [''])[0] if details.get('episode_run_time')
-                                             else '')
-        if runtime:
-            runtime = f"{runtime} min"
+            'first_air_date') or ''
+        
+        runtime_val = details.get('runtime')
+        episode_run_time = details.get('episode_run_time')
+        if runtime_val:
+            runtime = f"{runtime_val} min"
+        elif episode_run_time and isinstance(episode_run_time, list) and len(episode_run_time) > 0:
+            runtime = f"{episode_run_time[0]} min"
+        else:
+            runtime = ""
+
         vote_average = details.get('vote_average')
-        credits = details.get('credits', {})
-        cast = ', '.join([c['name'] for c in credits.get('cast', [])[:4]])
+        credits = details.get('credits') or {}
+        cast_list = credits.get('cast') or []
+        cast = ', '.join([c['name'] for c in cast_list[:4] if c and 'name' in c])
         director = ''
-        for c in credits.get('crew', []):
-            if c['job'] in ['Director', 'Directora']:
-                director = c['name']
+        crew_list = credits.get('crew') or []
+        for c in crew_list:
+            if c and c.get('job') in ['Director', 'Directora']:
+                director = c.get('name', '')
                 break
         lines = [
             f"{keyword_emojis} {genre_emojis} 🎬 <b>{title} ({release_date[:4] if release_date else 'N/D'})</b> 🎬 {keyword_emojis} {genre_emojis}",
