@@ -7,9 +7,30 @@ from dotenv import load_dotenv
 from telegram import Update, ChatMember
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes, MessageHandler, filters, ConversationHandler
 from bs4 import BeautifulSoup
+from functools import wraps
+from time import time
 
 # Cargar variables de entorno
 load_dotenv()
+
+
+class TTLCache:
+    def __init__(self, ttl_seconds: int = 300):
+        self.cache = {}
+        self.ttl = ttl_seconds
+
+    def __call__(self, func):
+        @wraps(func)
+        async def wrapper(*args, **kwargs):
+            key = (func.__name__, args, tuple(sorted(kwargs.items())))
+            now = time()
+            if key in self.cache and now - self.cache[key]['time'] < self.ttl:
+                return self.cache[key]['value']
+            result = await func(*args, **kwargs)
+            self.cache[key] = {'value': result, 'time': now}
+            return result
+        return wrapper
+
 
 # --- Configuración y Constantes ---
 logging.basicConfig(
@@ -350,6 +371,7 @@ def get_dynamic_closing():
 # --- Funciones de Búsqueda en APIs (Refactorizadas a async) ---
 
 
+@TTLCache(ttl_seconds=300)
 async def search_tvmaze(query: str):
     """Buscar en TVmaze API"""
     try:
@@ -391,6 +413,7 @@ async def search_tvmaze(query: str):
         return None, None
 
 
+@TTLCache(ttl_seconds=300)
 async def search_omdb(query: str):
     """Buscar en OMDb API (necesita API key)"""
     if not OMDB_API_KEY:

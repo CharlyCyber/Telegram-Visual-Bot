@@ -1,0 +1,15 @@
+[Unit]
+Description=Telegram Visual Bot
+After=network.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/home/ubuntu/Telegram-Visual-Bot
+EnvironmentFile=/home/ubuntu/Telegram-Visual-Bot/.env
+ExecStart=/home/ubuntu/Telegram-Visual-Bot/venv/bin/python bot.py
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
