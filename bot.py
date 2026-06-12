@@ -1,11 +1,8 @@
 import os
 import asyncio
 import httpx
-import random
+import re
 import logging
-import requests
-import threading
-from flask import Flask
 from dotenv import load_dotenv
 from telegram import Update, ChatMember
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes, MessageHandler, filters, ConversationHandler
@@ -13,21 +10,6 @@ from bs4 import BeautifulSoup
 
 # Cargar variables de entorno
 load_dotenv()
-
-# --- Servidor Web para Render ---
-flask_app = Flask(__name__)
-
-@flask_app.route('/')
-def home():
-    return '🤖 Bot de Telegram activo!'
-
-@flask_app.route('/health')
-def health():
-    return 'OK', 200
-
-def run_flask():
-    port = int(os.environ.get('PORT', 10000))
-    flask_app.run(host='0.0.0.0', port=port)
 
 # --- Configuración y Constantes ---
 logging.basicConfig(
@@ -48,7 +30,7 @@ SELECCIONANDO = 11
 # --- SISTEMA ANTISPAM MEJORADO ---
 
 # Palabras clave de spam (en minúsculas) - VERSIÓN MEJORADA
-PALABRAS_CLAVE_SPAM = [
+SPAM_KEYWORDS = [
     # Criptomonedas/Casino
     "eth libre",
     "Ethereum gratis",
@@ -62,15 +44,12 @@ PALABRAS_CLAVE_SPAM = [
     "cartera",
     "btc",
     "bitcoin",
-    "reclamar",
     "freeether.net",
     "eth alerta",
     "etéreo",
     "bono instantáneo",
     "plataforma con licencia",
-    "juego",
     "apuesta",
-    "ganar",
     "retirar",
     "depósito",
     "tragaperras",
@@ -80,7 +59,6 @@ PALABRAS_CLAVE_SPAM = [
     "bingo",
     "lotería",
     "jackpot",
-    "premios",
     "giros gratis",
     "registro",
     "verificación",
@@ -92,7 +70,6 @@ PALABRAS_CLAVE_SPAM = [
     "retiros rápidos",
     "seguro",
     "tarjetas",
-    "cripto",
     "e-wallets",
     "live casino",
     "online casino",
@@ -113,7 +90,6 @@ PALABRAS_CLAVE_SPAM = [
 
     # Términos financieros sospechosos
     "ganar dinero",
-    "ganar dinero",
     "dinero gratis",
     "dinero fácil",
     "ingresos pasivos",
@@ -123,7 +99,6 @@ PALABRAS_CLAVE_SPAM = [
     "comercio",
     "forex",
     "binario",
-    "lotería",
     "ganador",
     "premio",
     "recompensa",
@@ -142,7 +117,6 @@ PALABRAS_CLAVE_SPAM = [
     "tiempo limitado",
     "no te lo pierdas",
     "exclusivo",
-    "secreto",
     "instante",
     "por tiempo limitado",
     "no dura para siempre",
@@ -150,10 +124,6 @@ PALABRAS_CLAVE_SPAM = [
     "reclama ahora",
 
     # URLs y entrelaza sospechosos
-    "www.",
-    "http",
-    ".com",
-    ".net",
     "telegrama.yo",
     "t.me",
     "enlace",
@@ -168,8 +138,6 @@ PALABRAS_CLAVE_SPAM = [
     "Soporte 24 horas al día, 7 días a la semana",
     "depósito mío",
     "retiros",
-    "tarjetas",
-    "cripto",
     "carteras eléctricas",
     "se requiere verificación",
     "sin condiciones",
@@ -189,15 +157,13 @@ SPAM_URLS = [
 ]
 
 # Patrones de emojis sospechosos
-PATRÓN_EMOJI_SPAM = [
+SPAM_EMOJI_PATTERNS = [
     "🚨", "💰", "🔥", "🔑", "📥", "🔒", "⚡️", "🎮", "🕐", "💵", "✅", "💳", "🤑", "⚡️",
     "⏳", "👉", "🟢", "🎰", "🎲", "👑", "💎"
 ]
 
-import re
 
-
-def es_mensaje_spam(texto: str) -> bool:
+def is_spam_message(texto: str) -> bool:
     """Detecta si un mensaje es spam - VERSIÓN SUPER MEJORADA"""
     if not texto:
         return False
@@ -205,16 +171,16 @@ def es_mensaje_spam(texto: str) -> bool:
     texto_inferior = texto.lower()
 
     # 1. Palabras clave con regex (coincidencia exacta de palabras)
-    recuento_spam = 0
-    for palabra_clave in PALABRAS_CLAVE_SPAM:
+    spam_count = 0
+    for palabra_clave in SPAM_KEYWORDS:
         if re.search(rf"\b{re.escape(palabra_clave)}\b", texto_inferior):
-            recuento_spam += 1
+            spam_count += 1
 
     # 2. URL con expresiones regulares
-    url_spam = False
+    is_spam_url = False
     for url in SPAM_URLS:
         if url in texto_inferior:
-            url_spam = True
+            is_spam_url = True
             break
 
     # 3. Nombres específicos de casinos y términos relacionados
@@ -222,7 +188,7 @@ def es_mensaje_spam(texto: str) -> bool:
         "jetacas", "casino", "online casino", "online gambling",
         "online betting", "freeether.net"
     ]
-    tiene_nombre_casino = any(
+    has_casino_name = any(
         re.search(rf"\b{nombre}\b", texto_inferior)
         for nombre in nombres_casino)
 
@@ -233,7 +199,7 @@ def es_mensaje_spam(texto: str) -> bool:
 
     # 5. Combinación de elementos (emojis + palabras clave de casino/bono + URL)
     has_spam_combo = (
-        sum(1 for emoji in PATRÓN_EMOJI_SPAM if emoji in texto) >= 2
+        sum(1 for emoji in SPAM_EMOJI_PATTERNS if emoji in texto) >= 2
         and  # Al menos 2 emojis sospechosos
         any(palabra_clave in texto_inferior for palabra_clave in [
             "casino", "bonificación", "promoción", "jetacas", "bonus",
@@ -245,30 +211,30 @@ def es_mensaje_spam(texto: str) -> bool:
     # 6. Estructura de spam (múltiples líneas con emojis)
     lineas = texto.split('\n')
     lineas_emoji = sum(1 for linea in lineas
-                       if any(emoji in linea for emoji in PATRÓN_EMOJI_SPAM))
-    tiene_estructura_spam = lineas_emoji >= 4
+                       if any(emoji in linea for emoji in SPAM_EMOJI_PATTERNS))
+    has_spam_structure = lineas_emoji >= 4
 
     # 7. Verificar longitud excesiva (spam típico es muy largo)
-    es_demasiado_largo = len(
+    is_too_long = len(
         texto) > 250  # Ajustado a 250 para ser más sensible
 
     # 8. Detección de mayúsculas excesivas (indicador de spam)
     mayusculas_count = sum(1 for char in texto if char.isupper())
     total_letras = sum(1 for char in texto if char.isalpha())
-    tiene_caps_sospechosos = False
+    has_suspicious_caps = False
     if total_letras > 0:
         porcentaje_mayusculas = (mayusculas_count / total_letras) * 100
         if porcentaje_mayusculas > 50 and len(
                 texto) > 50:  # Más del 50% de mayúsculas en mensajes largos
-            tiene_caps_sospechosos = True
+            has_suspicious_caps = True
 
     # Condiciones de detección (más restricciones)
-    return (recuento_spam >= 3 or  # Aumentado a 3 para mayor precisión
-            url_spam or tiene_nombre_casino or
+    return (spam_count >= 3 or  # Aumentado a 3 para mayor precisión
+            is_spam_url or has_casino_name or
             patron_casino_especifico is not None or has_spam_combo or
-            (tiene_estructura_spam and recuento_spam >= 1) or
-            (es_demasiado_largo
-             and recuento_spam >= 1) or tiene_caps_sospechosos)
+            (has_spam_structure and spam_count >= 1) or
+            (is_too_long
+             and spam_count >= 1) or has_suspicious_caps)
 
 
 # --- Funciones de Utilidad ---
@@ -280,8 +246,7 @@ async def is_user_in_group(context: ContextTypes.DEFAULT_TYPE,
         return chat_member.status in ['member', 'administrator', 'creator']
     except Exception as e:
         logger.error(f"Error verificando membresía del usuario {user_id}: {e}")
-        logger.warning("Permitiendo acceso debido a error de verificación de grupo")
-        return True  # Permitir acceso cuando hay errores
+        return False  # Denegar acceso cuando hay errores
 
 
 # --- Diccionarios de Emojis ---
@@ -378,7 +343,7 @@ def get_synopsis_with_emojis(synopsis):
     return result.strip()
 
 
-def get_dynamic_closing(synopsis):
+def get_dynamic_closing():
     return "🤖 Automatización creada por Charli AI, ofrecemos servicios generales de IA 🚀✨"
 
 
@@ -417,7 +382,7 @@ async def search_tvmaze(query: str):
         if premiered:
             caption += f"📅 <b>Estreno:</b> {premiered}\n"
 
-        caption += f"\n{get_dynamic_closing(summary)}{FIRME}"
+        caption += f"\n{get_dynamic_closing()}{FIRME}"
 
         return image_url, caption
 
@@ -465,7 +430,7 @@ async def search_omdb(query: str):
         if rating and rating != 'N/A':
             caption_parts.append(f"\n⭐️ <b>Calificación IMDb:</b> {rating}/10")
 
-        caption_parts.append(f"\n{get_dynamic_closing(plot)}{FIRME}")
+        caption_parts.append(f"\n{get_dynamic_closing()}{FIRME}")
         caption = '\n'.join(caption_parts)
 
         return poster_url, caption
@@ -488,8 +453,8 @@ async def search_tmdb_and_show_options(update: Update,
                 client.get(url_tv, timeout=10))
             data_movie = r_movie.json()
             data_tv = r_tv.json()
-            logging.info(f'TMDb movie: {data_movie}')
-            logging.info(f'TMDb tv: {data_tv}')
+            logger.info(f'TMDb movie: {data_movie}')
+            logger.info(f'TMDb tv: {data_tv}')
 
         results = []
         for item in data_movie.get('results', []):
@@ -586,7 +551,7 @@ async def publish_tmdb_item(update: Update,
         if genres:
             lines.append(
                 f"\n🎞️ <b>Géneros:</b> {', '.join(genres)} {genre_emojis}")
-        lines.append(f"\n{get_dynamic_closing(overview)}{FIRME}")
+        lines.append(f"\n{get_dynamic_closing()}{FIRME}")
         caption = '\n'.join(lines)
 
         # --- TRUNCADO DE CAPTION PARA TELEGRAM (Límite 1024 caracteres) ---
@@ -607,7 +572,7 @@ async def publish_tmdb_item(update: Update,
                     if release_date: lines.append(f"\n📅 <b>Estreno:</b> {release_date}")
                     if vote_average: lines.append(f"\n⭐️ <b>Calificación IMDb:</b> {vote_average}/10")
                     if genres: lines.append(f"\n🎞️ <b>Géneros:</b> {', '.join(genres)} {genre_emojis}")
-                    lines.append(f"\n{get_dynamic_closing(overview)}{FIRME}")
+                    lines.append(f"\n{get_dynamic_closing()}{FIRME}")
                     caption = '\n'.join(lines)
             
             # Si aún es demasiado larga, truncar a lo bruto
@@ -723,7 +688,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     logger.info(f"handle_message llamado con texto: '{update.message.text}' de usuario {update.message.from_user.id}")
     # FILTRO 1: Verificar si es spam
-    if es_mensaje_spam(update.message.text):
+    if is_spam_message(update.message.text):
         logger.info(
             f"Mensaje de spam ignorado de usuario {update.message.from_user.id}: {update.message.text[:50]}..."
         )
@@ -871,11 +836,6 @@ def main() -> None:
             "Faltan variables de entorno críticas (BOT_TOKEN, TMDB_API_KEY). El bot no puede iniciar."
         )
         return
-
-    # Iniciar servidor Flask en un hilo separado
-    flask_thread = threading.Thread(target=run_flask, daemon=True)
-    flask_thread.start()
-    logger.info("Servidor web iniciado...")
 
     app = ApplicationBuilder().token(BOT_TOKEN).build()
 
