@@ -4,7 +4,7 @@ Script de prueba para verificar el sistema anti-spam
 """
 import sys
 import os
-sys.path.append('/app')
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from bot import is_spam_message
 

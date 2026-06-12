@@ -13,7 +13,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Add current directory to path to import bot functions
-sys.path.append('/app')
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 async def test_spanish_matrix_search():
     """Test searching for Matrix in Spanish using bot functions"""
