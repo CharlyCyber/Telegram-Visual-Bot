@@ -855,9 +855,24 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     return ConversationHandler.END
 
 
+class HealthHandler(http.server.BaseHTTPRequestHandler):
+    def do_GET(self):
+        if self.path == '/health':
+            self.send_response(200)
+            self.send_header('Content-Type', 'text/plain')
+            self.end_headers()
+            self.wfile.write(b'OK')
+        else:
+            self.send_response(404)
+            self.end_headers()
+
+    def log_message(self, format, *args):
+        logger.debug(f"Health server: {format % args}")
+
+
 def _run_health_server():
     port = int(os.environ.get('PORT', 10000))
-    server = socketserver.TCPServer(("", port), http.server.SimpleHTTPRequestHandler)
+    server = socketserver.TCPServer(("", port), HealthHandler)
     server.serve_forever()
 
 
