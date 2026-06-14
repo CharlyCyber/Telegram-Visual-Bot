@@ -3,6 +3,9 @@ import asyncio
 import httpx
 import re
 import logging
+import http.server
+import socketserver
+import threading
 from dotenv import load_dotenv
 from telegram import Update, ChatMember
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes, MessageHandler, filters, ConversationHandler
@@ -852,6 +855,12 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     return ConversationHandler.END
 
 
+def _run_health_server():
+    port = int(os.environ.get('PORT', 10000))
+    server = socketserver.TCPServer(("", port), http.server.SimpleHTTPRequestHandler)
+    server.serve_forever()
+
+
 def main() -> None:
     """Inicia el bot."""
     if not all([BOT_TOKEN, TMDB_API_KEY]):
@@ -859,6 +868,10 @@ def main() -> None:
             "Faltan variables de entorno críticas (BOT_TOKEN, TMDB_API_KEY). El bot no puede iniciar."
         )
         return
+
+    health_thread = threading.Thread(target=_run_health_server, daemon=True)
+    health_thread.start()
+    logger.info("Health server iniciado...")
 
     app = ApplicationBuilder().token(BOT_TOKEN).build()
 
