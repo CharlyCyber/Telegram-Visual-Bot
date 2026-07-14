@@ -322,34 +322,38 @@ def get_keyword_emojis(title):
     return ' '.join({e for k, e in title_keyword_emojis.items() if k in t})
 
 
+MAX_SYNOPSIS_EMOJIS = 30
+
+
 def get_synopsis_with_emojis(synopsis):
+    """Inserta un emoji junto a cada palabra que coincida con una keyword.
+
+    Recorre la sinopsis palabra por palabra y añade el emoji correspondiente
+    inmediatamente después de la palabra relevante. Limita el total con
+    MAX_SYNOPSIS_EMOJIS para no exceder el tope de 1024 chars del caption.
+    """
     if not synopsis:
         return ''
-    synopsis_lower = synopsis.lower()
-    found_emojis = []
-    for keyword, emoji in synopsis_keyword_emojis.items():
-        if keyword in synopsis_lower and emoji not in found_emojis:
-            found_emojis.append(emoji)
-            if len(found_emojis) >= 8: # Aumentado para mejor distribución
+
+    tokens = re.split(r'(\s+)', synopsis)  # conserva los espacios
+    result = []
+    added = 0
+    for token in tokens:
+        result.append(token)
+        if not token.strip() or added >= MAX_SYNOPSIS_EMOJIS:
+            continue
+        clean = re.sub(r'[^\wáéíóúüñ]', '', token.lower())
+        if not clean:
+            continue
+        for keyword, emoji in synopsis_keyword_emojis.items():
+            if keyword == clean or keyword in clean:
+                result.append(f' {emoji}')
+                added += 1
                 break
-    
-    if not found_emojis:
+
+    if added == 0:
         return synopsis
-
-    # Distribuir emojis: inicio, medio y fin
-    n = len(found_emojis)
-    start_emojis = ' '.join(found_emojis[:n//3])
-    mid_emojis = ' '.join(found_emojis[n//3:2*n//3])
-    end_emojis = ' '.join(found_emojis[2*n//3:])
-
-    # Insertar en el medio (aproximadamente)
-    mid_point = len(synopsis) // 2
-    # Buscar el espacio más cercano para no romper palabras
-    space_idx = synopsis.find(' ', mid_point)
-    if space_idx == -1: space_idx = mid_point
-
-    result = f"{start_emojis} {synopsis[:space_idx]} {mid_emojis} {synopsis[space_idx:]} {end_emojis}"
-    return result.strip()
+    return ''.join(result)
 
 
 def get_dynamic_closing(_synopsis=None):

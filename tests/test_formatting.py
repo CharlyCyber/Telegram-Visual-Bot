@@ -26,3 +26,25 @@ def test_synopsis_can_be_escaped_safely():
     out = esc(get_synopsis_with_emojis(raw))
     assert '<script>' not in out
     assert '&lt;script&gt;' in out
+
+
+def test_synopsis_emoji_after_each_matching_word():
+    out = get_synopsis_with_emojis("El asesino busca amor en el espacio")
+    for word, emoji in (("asesino", "🔪"), ("amor", "❤️"), ("espacio", "🚀")):
+        assert emoji in out, f"falta emoji {emoji} para {word}"
+        assert out.index(word) < out.index(emoji), f"{emoji} no va tras {word}"
+
+
+def test_synopsis_no_match_returns_original():
+    txt = "xyzzy qwerty zzz"
+    assert get_synopsis_with_emojis(txt) == txt
+
+
+def test_synopsis_empty():
+    assert get_synopsis_with_emojis("") == ""
+
+
+def test_synopsis_emoji_count_capped():
+    words = " ".join(["amor guerra espacio asesino robot fuego"] * 20)
+    out = get_synopsis_with_emojis(words)
+    assert out.count("❤️") <= 30
