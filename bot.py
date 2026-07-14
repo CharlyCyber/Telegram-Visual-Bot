@@ -1,5 +1,6 @@
 import os
 import asyncio
+import html
 import httpx
 import re
 import logging
@@ -51,6 +52,11 @@ FIRME = os.getenv("SIGNATURE", "\n\n💻ANDY (el+lin2)🛠️🪛 📍Ave 3️�
 # Estados de la conversación
 SELECCIONANDO = 11
 
+# --- Separadores visuales ---
+SEP = "━━━━━━━━━━━━━━━━━━━━━━"
+SEP_SOFT = "┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈"
+SEP_STAR = "･ﾟ✧ ━━━━━━━━━━━━━ ✧ﾟ･"
+
 # --- SISTEMA ANTISPAM MEJORADO ---
 
 # Palabras clave de spam (en minúsculas) - VERSIÓN MEJORADA
@@ -84,16 +90,11 @@ SPAM_KEYWORDS = [
     "lotería",
     "jackpot",
     "giros gratis",
-    "registro",
-    "verificación",
     "sin identificación",
-    "instantáneo",
     "24/7 soporte",
     "mínimo depósito",
     "pagos justos",
     "retiros rápidos",
-    "seguro",
-    "tarjetas",
     "e-wallets",
     "live casino",
     "online casino",
@@ -117,67 +118,46 @@ SPAM_KEYWORDS = [
     "dinero gratis",
     "dinero fácil",
     "ingresos pasivos",
-    "inversión",
-    "ganancia",
     "roi",
-    "comercio",
     "forex",
-    "binario",
-    "ganador",
-    "premio",
-    "recompensa",
-    "regalo",
     "sin tarifas",
     "libre de riesgos",
     "garantizado",
 
     # Llamadas a la acción urgentes
     "haga clic aquí",
-    "visitar",
     "regístrate ahora",
-    "registrarse",
     "actúa ahora",
-    "fecha prisa",
     "tiempo limitado",
     "no te lo pierdas",
-    "exclusivo",
-    "instante",
     "por tiempo limitado",
     "no dura para siempre",
     "lanzamiento aire limitado",
     "reclama ahora",
 
-    # URLs y entrelaza sospechosos
+    # URLs y enlaces sospechosos
     "telegrama.yo",
-    "t.me",
-    "enlace",
-    "url",
 
     # Términos de marketing agresivo
-    "oferta",
-    "trato",
     "trabajar desde casa",
     "mlm",
     "pirámide",
     "Soporte 24 horas al día, 7 días a la semana",
     "depósito mío",
-    "retiros",
     "carteras eléctricas",
     "se requiere verificación",
     "sin condiciones",
     "implementar registro",
     "conecta tu billetera",
-    "verificar",
     "el equilibrio cree"
 ]
 
-# URLs sospechosas - VERSIÓN MEJORADA
+# Dominios/URLs de scam conocidos (coincidencia por substring).
+# Solo dominios reales: las palabras genéricas ("gratis", "dinero", "casino")
+# provocaban falsos positivos en títulos legítimos.
 SPAM_URLS = [
-    "jetacas.com", "freeether.net", "freecrypto", "lanzamiento aéreo",
-    "reclamar dinero", "gana", "bitcoins de Pecar", "cryptogift", "freetokens",
-    "casino", "bonificación", "promoción", "reclamar", "gratis", "ganar",
-    "dinero", "jetacas.com", "freeether.net", "onlinecasino.com",
-    "gamblingsite.net", "bettingplatform.org"
+    "jetacas.com", "freeether.net", "freecrypto", "cryptogift", "freetokens",
+    "onlinecasino.com", "gamblingsite.net", "bettingplatform.org"
 ]
 
 # Patrones de emojis sospechosos
@@ -207,13 +187,11 @@ def is_spam_message(texto: str) -> bool:
             is_spam_url = True
             break
 
-    # 3. Nombres específicos de casinos y términos relacionados
-    nombres_casino = [
-        "jetacas", "casino", "online casino", "online gambling",
-        "online betting", "freeether.net"
-    ]
+    # 3. Nombres de servicios de scam específicos (NO "casino" a secas: es un
+    # título de película legítimo). Solo marcas/dominios inequívocos.
+    nombres_casino = ["jetacas", "freeether.net"]
     has_casino_name = any(
-        re.search(rf"\b{nombre}\b", texto_inferior)
+        re.search(rf"\b{re.escape(nombre)}\b", texto_inferior)
         for nombre in nombres_casino)
 
     # 4. Patrones de spam de casino específicos
@@ -309,171 +287,30 @@ title_keyword_emojis = {
     'fantasía': '🧚', 'familia': '👨‍👩‍👧‍👦', 'dragón': '🐉', 'magia': '✨',
     'aventura': '🗺️', 'crimen': '🕵️‍♂️', 'suspenso': '😱', 'animación': '🎨',
     'perro': '🐶', 'gato': '🐱', 'viaje': '✈️', 'tiempo': '⏳', 'muerte': '💀',
-    'vida': '🌱', 'mundo': '🌍', 'batalla': '⚔️', 'poder': '⚡', 'secreto': '🤫',
-    'ninja': '🥷', 'samurai': '⚔️', 'pirata': '🏴‍☠️', 'caballero': '🛡️', 'rey': '👑',
-    'reina': '👑', 'princesa': '👸', 'príncipe': '🤴', 'mago': '🧙', 'bruja': '🧙‍♀️',
-    'vampiro': '🧛', 'demonio': '😈', 'ángel': '😇', 'zombie': '🧟', 'monstruo': '👹',
-    'coche': '🚗', 'moto': '🏍️', 'cohete': '🚀', 'planeta': '🪐', 'universo': '🌌',
-    'montaña': '⛰️', 'volcán': '🌋', 'desierto': '🏜️', 'bosque': '🌲', 'ciudad': '🏙️',
-    'castillo': '🏰', 'cueva': '🕳️', 'tesoro': '💎', 'espada': '⚔️', 'escudo': '🛡️',
-    'libro': '📚', 'mapa': '🗺️', 'brújula': '🧭', 'reloj': '⏰', 'llave': '🔑',
-    'fútbol': '⚽', 'boxeo': '🥊', 'lucha': '🥊', 'carrera': '🏎️', 'surf': '🏄',
-    'guerrero': '⚔️', 'soldado': '🎖️', 'espía': '🕵️‍♂️', 'policía': '👮', 'piloto': '✈️',
-    'médico': '👨‍⚕️', 'abogado': '👨‍⚖️', 'científico': '🔬', 'explorador': '🗺️', 'tesoro': '💎',
-    'venganza': 'venge', 'traición': '🐍', 'redención': '🙏', 'destino': '🔮', 'guerra': '⚔️',
-    'paz': '☮️', 'amor': '❤️', 'odio': '💔', 'muerte': '💀', 'vida': '🌱',
-    'sueño': '💤', 'pesadilla': '😱', 'magia': '✨', 'hechizo': '🧙', 'poción': '🧪',
-    'corona': '👑', 'trono': '🪑', 'reino': '🏰', 'imperio': '🏛️', 'batalla': '⚔️',
-    'espada': '⚔️', 'arco': '🏹', 'bomba': '💣', 'pistola': '🔫', 'cuchillo': '🔪',
-    'escudo': '🛡️', 'armadura': '🛡️', 'casco': '⛑️', 'hacha': '🪓', 'lanza': '🗡️',
-    'dragon': '🐉', 'fénix': '🔥', 'unicornio': '🦄', 'grifo': '🦅', 'hidra': '🐉',
-    'lobo': '🐺', 'oso': '🐻', 'león': '🦁', 'tigre': '🐅', 'águila': '🦅',
-    'ballena': '🐋', 'tiburón': '🦈', 'pulpo': '🐙', 'serpiente': '🐍', 'araña': '🕷️',
-    'robó': '🤖', 'cyborg': '🤖', 'android': '🤖', 'alien': '👽', 'UFO': '🛸',
-    'nave': '🚀', 'estación espacial': '🛰️', 'laboratorio': '🔬', 'invento': '💡', 'futuro': '🔮',
-    'pasado': '🕰️', 'tiempo': '⏳', 'viaje en el tiempo': '⏰', 'realidad virtual': '🥽', 'simulación': '💻',
-    'internet': '🌐', 'hacker': '💻', 'virus': '🦠', 'inteligencia artificial': '🤖', ' IA ': '🤖',
-    'asesino': '🔪', 'detective': '🕵️‍♂️', 'crimen': '🕵️', 'misterio': '🕵️', 'secreto': '🤫',
-    'conspiración': '🤫', 'espionaje': '🕵️‍♂️', 'traición': '🐍', 'mента': '💰', 'droga': '💊',
-    'ladrón': '🦹', 'atracón': '💰', 'robo': '💰', 'hurto': '💰', 'estafa': '💰',
-    'coche de policía': '🚔', 'ambulancia': '🚑', 'bombero': '🚒', 'helicoptero': '🚁', 'submarino': '🚢',
-    'tren': '🚂', 'barco': '🚢', 'avión': '✈️', 'cohete': '🚀', 'nave espacial': '🚀',
-    'comida': '🍔', 'restaurante': '🍽️', 'cocina': '👨‍🍳', 'chef': '👨‍🍳', 'café': '☕',
-    'cerveza': '🍺', 'vino': '🍷', 'cóctel': '🍸', 'baile': '💃', 'fiesta': '🎉',
-    'concierto': '🎵', 'festival': '🎪', 'carnaval': '🎭', 'máscara': '🎭', 'payaso': '🤡',
-    'circo': '🎪', 'magia': '✨', 'ilusión': '✨', 'truco': '✨', 'truco': '✨',
-    'escuela': '🏫', 'universidad': '🎓', 'biblioteca': '📚', 'museo': '🏛️', 'teatro': '🎭',
-    'cine': '🎬', 'televisión': '📺', 'radio': '📻', 'periodista': '📰', 'reportero': '📰',
-    'deportes': '🏅', 'campeonato': '🏆', 'medalla': '🥇', 'copa': '🏆', 'torneo': '🏆',
-    'fútbol': '⚽', 'baloncesto': '🏀', 'tenis': '🎾', 'golf': '⛳', 'natación': '🏊',
-    'esquí': '🎿', 'surf': '🏄', 'boxeo': '🥊', 'artes marciales': '🥋', 'carrera': '🏎️',
-    'aventura': '🗺️', 'exploración': '🧭', 'descubrimiento': '🔍', 'expedición': '🧭', 'mapa': '🗺️',
-    'tesoro': '💎', 'pirata': '🏴‍☠️', 'tesoro escondido': '💎', 'cofre': '📦', 'moneda': '🪙',
-    'medieval': '⚔️', 'caballero': '🛡️', 'castillo': '🏰', 'reino': '🏰', 'princesa': '👸',
-    'dragón': '🐉', 'mago': '🧙', 'espada': '⚔️', 'armadura': '🛡️', 'corona': '👑',
-    'espacial': '🚀', 'alienígena': '👽', 'planeta': '🪐', 'galaxia': '🌌', 'universo': '🌌',
-    'nave': '🚀', 'estación espacial': '🛰️', 'astronauta': '🧑‍🚀', 'cosmonauta': '🧑‍🚀', 'cometa': '☄️',
-    'apocalipsis': '💥', 'post-apocalíptico': '☢️', 'zombie': '🧟', 'virus': '🦠', 'pandemia': '🦠',
-    'catástrofe': '💥', 'terremoto': '🌋', 'tsunami': '🌊', 'tormenta': '⛈️', 'inundación': '🌊',
-    'romance': '❤️', 'comedia': '😂', 'drama': '🎭', 'thriller': '😱', 'horror': '👻',
-    'ciencia ficción': '🚀', 'fantasía': '🧚', 'western': '🤠', 'bélico': '⚔️', 'musical': '🎵',
-    'documental': '🎥', 'biopic': '🎭', 'noir': '🕵️', 'slasher': '🔪', 'whodunit': '🕵️',
+    'vida': '🌱', 'mundo': '🌍', 'batalla': '⚔️', 'poder': '⚡', 'secreto': '🤫'
 }
 
 synopsis_keyword_emojis = {
     'asesino': '🔪', 'misterio': '🕵️', 'amor': '❤️', 'guerra': '⚔️', 'espacio': '🚀',
     'luna': '🌙', 'robot': '🤖', 'futuro': '🔮', 'ballet': '🩰', 'familia': '👨‍👩‍👧‍👦',
-    'venganza': 'venge', 'crimen': '🕵️', 'viaje': '✈️', 'mar': '🌊', 'monstruo': '👹',
+    'venganza': '😠', 'crimen': '🕵️', 'viaje': '✈️', 'mar': '🌊', 'monstruo': '👹',
     'música': '🎵', 'superhéroe': '🦸', 'magia': '✨', 'batalla': '⚔️', 'sueño': '💤',
     'dinero': '💰', 'rescate': '🆘', 'explosión': '💥', 'coche': '🚗', 'dragón': '🐉',
     'fuego': '🔥', 'espada': '⚔️', 'reino': '🏰', 'bosque': '🌲', 'ciudad': '🏙️',
     'policía': '👮', 'detective': '🕵️‍♂️', 'prisión': '⛓️', 'huida': '🏃',
     'secreto': '🤫', 'traición': '🐍', 'amistad': '🤝', 'escuela': '🏫',
     'universidad': '🎓', 'tecnología': '💻', 'virus': '🦠', 'zombie': '🧟',
-    'alienígena': '👽', 'planeta': '🪐', 'tiempo': '⏳', 'pasado': '🕰️',
-    'ninja': '🥷', 'samurai': '⚔️', 'pirata': '🏴‍☠️', 'caballero': '🛡️', 'rey': '👑',
-    'reina': '👑', 'princesa': '👸', 'príncipe': '🤴', 'mago': '🧙', 'bruja': '🧙‍♀️',
-    'vampiro': '🧛', 'hombre lobo': '🐺', 'demonio': '😈', 'ángel': '😇', 'muerto': '💀',
-    'lucha': '🥊', 'boxeo': '🥊', 'fútbol': '⚽', 'baloncesto': '🏀', 'tenis': '🎾',
-    'carrera': '🏎️', 'coche': '🚗', 'moto': '🏍️', 'avión': '✈️', 'cohete': '🚀',
-    'oceano': '🌊', 'río': '🏞️', 'montaña': '⛰️', 'volcán': '🌋', 'desierto': '🏜️',
-    'bosque': '🌲', 'jungla': '🌴', 'ciudad': '🏙️', 'pueblo': '🏘️', 'castillo': '🏰',
-    'torre': '🗼', 'puente': '🌉', 'templo': '⛩️', 'pirámide': '🏛️', 'cueva': '🕳️',
-    'tesoro': '💎', 'oro': '🥇', 'corona': '👑', 'trono': '🪑', 'espada': '⚔️',
-    'escudo': '🛡️', 'arco': '🏹', 'flecha': '🏹', 'bomba': '💣', 'pistola': '🔫',
-    'cuchillo': '🔪', 'lanza': '🗡️', 'armadura': '🛡️', 'casco': '⛑️', 'hacha': '🪓',
-    'libro': '📚', 'mapa': '🗺️', 'brújula': '🧭', 'reloj': '⏰', 'calendario': '📅',
-    'carta': '✉️', 'sobre': '💌', 'regalo': '🎁', 'caja': '📦', 'llave': '🔑',
-    'cerradura': '🔒', 'candado': '🔒', 'cadena': '⛓️', 'puerta': '🚪',
-    'escalera': '🪜', 'ascensor': '🛗', 'camión': '🚚', 'autobús': '🚌',
-    'tren': '🚂', 'barco': '🚢', 'helicóptero': '🚁',
-    'bicicleta': '🚲', 'moto': '🏍️', 'surf': '🏄',
-    'esquí': '🎿', 'snowboard': '🏂', 'paracaídas': '🪂',
-    'fuego': '🔥', 'humo': '💨', 'niebla': '🌫️', 'lluvia': '🌧️', 'nieve': '❄️',
-    'hielo': '🧊', 'rayo': '⚡', 'arcoíris': '🌈', 'sol': '☀️',
-    'luna': '🌙', 'estrella': '⭐', 'cometa': '☄️', 'meteorito': '☄️',
-    'aurora': '🌌', 'galaxia': '🌌', 'universo': '🌌', 'nebulosa': '🌌',
-    'cielo': '🌤️', 'nube': '☁️', 'tormenta': '⛈️', 'viento': '💨', 'tornado': '🌪️',
-    'huracán': '🌀', 'tsunami': '🌊', 'terremoto': '🌋', 'inundación': '🌊',
-    'incendio': '🔥', 'colisión': '💥', 'golpe': '👊', 'puñetazo': '👊',
-    'abrazo': '🤗', 'beso': '💋', 'sonrisa': '😊', 'risa': '😂', 'llanto': '😢',
-    'susto': '😱', 'sorpresa': '😲', 'enfado': '😠', 'tristeza': '😢', 'alegría': '😄',
-    'amor': '❤️', 'odio': '💔', 'amistad': '🤝', 'enemistad': '⚔️', 'alianza': '🤝',
-    'traición': '🐍', 'perdón': '🙏', 'esperanza': '🌟', 'fe': '🙏',
-    'miedo': '😱', 'valor': '💪', 'sabiduría': '🧠', 'fuerza': '💪',
-    'velocidad': '⚡', 'agilidad': '🏃', 'resistencia': '💪', 'flexibilidad': '🧘',
-    'paz': '☮️', 'guerra': '⚔️', 'batalla': '⚔️', 'lucha': '🥊', 'combate': '⚔️',
-    'duelo': '⚔️', 'rivalidad': '⚔️', 'competencia': '🏆', 'campeonato': '🏆',
-    'torneo': '🏆', 'copa': '🏆', 'medalla': '🥇', 'podio': '🏆',
-    'trofeo': '🏆', 'premio': '🎁', 'recompensa': '🎁', 'sorpresa': '🎁',
-    'misterio': '🕵️', 'secreto': '🤫', 'acertijo': '🧩', 'puzzle': '🧩',
-    'búsqueda': '🔍', 'investigación': '🔍', 'descubrimiento': '🔍',
-    'ciencia': '🔬', 'experimento': '🧪', 'laboratorio': '🔬', 'invento': '💡',
-    'tecnología': '💻', 'computadora': '💻', 'internet': '🌐', 'robot': '🤖',
-    'futuro': '🔮', 'pasado': '🕰️', 'presente': '⏳', 'tiempo': '⏳', 'historia': '📜',
-    'leyenda': '📜', 'mito': '📜', 'cuento': '📖', 'novela': '📖', 'libro': '📚',
-    'biblioteca': '📚', 'escritor': '✍️', 'escritura': '✍️',
-    'pintura': '🎨', 'artista': '🎨', 'música': '🎵', 'músico': '🎸', 'cantante': '🎤',
-    'baile': '💃', 'danza': '💃', 'teatro': '🎭', 'actor': '🎭',
-    'película': '🎬', 'cine': '🎬', 'serie': '📺', 'televisión': '📺',
-    'juego': '🎮', 'videojuego': '🎮', 'deporte': '🏅', 'atleta': '🏅',
-    'guerrero': '⚔️', 'soldado': '🎖️', 'general': '🎖️', 'capitán': '🎖️',
-    'rey': '👑', 'reina': '👑', 'príncipe': '🤴', 'princesa': '👸', 'noble': '👑',
-    'campesino': '👨‍🌾', 'granjero': '👨‍🌾', 'aldeano': '🏘️', 'ciudadano': '🏙️',
-    'viajero': '✈️', 'explorador': '🗺️', 'aventurero': '🗺️', 'pionero': '🗺️',
-    'pirata': '🏴‍☠️', 'corsario': '🏴‍☠️', 'bucanero': '🏴‍☠️', 'tesoro': '💎', 'botín': '💰',
-    'dinero': '💰', 'riqueza': '💰', 'fortuna': '💰', 'herencia': '💰',
-    'familia': '👨‍👩‍👧‍👦', 'padre': '👨', 'madre': '👩', 'hijo': '👦', 'hija': '👧',
-    'hermano': '👦', 'hermana': '👧', 'abuelo': '👴', 'abuela': '👵',
-    'esposo': '👨', 'esposa': '👩', 'novio': '👦', 'novia': '👧', 'amigo': '🤝',
-    'enemigo': '⚔️', 'rival': '⚔️', 'aliado': '🤝', 'compañero': '🤝',
-    'maestro': '🧑‍🏫', 'alumno': '🧑‍🎓', 'estudiante': '🧑‍🎓', 'profesor': '🧑‍🏫',
-    'médico': '👨‍⚕️', 'enfermera': '👩‍⚕️', 'hospital': '🏥', 'ambulancia': '🚑',
-    'policía': '👮', 'detective': '🕵️‍♂️', 'agente': '🕵️‍♂️', 'espía': '🕵️‍♂️',
-    'abogado': '👨‍⚖️', 'juez': '👨‍⚖️', 'criminal': '😈', 'preso': '⛓️',
-    'prisión': '⛓️', 'cárcel': '⛓️', 'celda': '⛓️', 'juicio': '⚖️',
-    'comida': '🍔', 'restaurante': '🍽️', 'cocina': '👨‍🍳', 'chef': '👨‍🍳',
-    'pizza': '🍕', 'sushi': '🍣', 'taco': '🌮', 'hamburguesa': '🍔',
-    'café': '☕', 'cerveza': '🍺', 'vino': '🍷', 'cóctel': '🍸',
-    'postre': '🍰', 'pastel': '🎂', 'helado': '🍦', 'chocolate': '🍫',
-    'fruta': '🍎', 'manzana': '🍎', 'naranja': '🍊', 'fresa': '🍓',
-    'verdura': '🥬', 'tomate': '🍅', 'cebolla': '🧅', 'chile': '🌶️',
-    'pan': '🍞', 'queso': '🧀', 'carne': '🥩', 'pollo': '🍗', 'pescado': '🐟',
-    'amor': '❤️', 'corazón': '💔', 'boda': '💒', 'anillo': '💍', 'beso': '💋',
-    'romance': '❤️', 'pareja': '💑', 'noviazgo': '💑', 'matrimonio': '💒',
-    'bebé': '👶', 'embarazo': '🤰', 'parto': '👶', 'criatura': '👶',
-    'niño': '👦', 'niña': '👧', 'adolescente': '🧑', 'adulto': '🧑', 'anciano': '👴',
-    'mascota': '🐶', 'perro': '🐶', 'gato': '🐱', 'pájaro': '🐦', 'pez': '🐟',
-    'caballo': '🐴', 'vaca': '🐄', 'cerdo': '🐷', 'oveja': '🐑', 'gallina': '🐔',
-    'árbol': '🌳', 'flor': '🌸', 'planta': '🌱', 'hoja': '🍃', 'raíz': '🌱',
-    'jardín': '🌻', 'bosque': '🌲', 'selva': '🌴', 'campo': '🌾', 'pradera': '🌿',
-    'montaña': '⛰️', 'colina': '⛰️', 'valle': '🏞️', 'río': '🏞️', 'lago': '🏞️',
-    'mar': '🌊', 'océano': '🌊', 'playa': '🏖️', 'isla': '🏝️', 'costa': '🏖️',
-    'desierto': '🏜️', 'nieve': '❄️', 'hielo': '🧊', 'volcán': '🌋',
-    'sol': '☀️', 'luna': '🌙', 'estrella': '⭐', 'cielo': '🌤️', 'nube': '☁️',
-    'lluvia': '🌧️', 'viento': '💨', 'tormenta': '⛈️', 'trueno': '⚡', 'rayo': '⚡',
-    'fuego': '🔥', 'agua': '💧', 'tierra': '🌍', 'aire': '💨',
-    'diamante': '💎', 'oro': '🥇', 'plata': '🥈', 'bronce': '🥉',
-    'perla': '⚪', 'cristal': '💎', 'rubi': '🔴', 'zafiro': '🔵', 'esmeralda': '🟢',
-    'roca': '🪨', 'piedra': '🪨', 'madera': '🪵', 'metal': '⚙️', 'hierro': '⚙️',
-    'fuerza': '💪', 'velocidad': '⚡', 'poder': '⚡', 'energía': '⚡', 'electricidad': '⚡',
-    'inteligencia': '🧠', 'sabiduría': '🧠', 'conocimiento': '📚', 'educación': '🎓',
-    'ciencia': '🔬', 'tecnología': '💻', 'invento': '💡', 'descubrimiento': '🔍',
-    'arte': '🎨', 'música': '🎵', 'pintura': '🎨', 'escultura': '🗿', 'fotografía': '📷',
-    'baile': '💃', 'teatro': '🎭', 'cine': '🎬', 'literatura': '📚', 'poesía': '📝',
-    'comida': '🍔', 'bebida': '🥤', 'cerveza': '🍺', 'vino': '🍷', 'café': '☕',
-    'deporte': '🏅', 'juego': '🎮', 'competencia': '🏆', 'campeonato': '🏆',
-    'viaje': '✈️', 'aventura': '🗺️', 'exploración': '🧭', 'descubrimiento': '🔍',
-    'guerra': '⚔️', 'paz': '☮️', 'batalla': '⚔️', 'combate': '⚔️', 'lucha': '🥊',
-    'amor': '❤️', 'odio': '💔', 'amistad': '🤝', 'enemistad': '⚔️', 'familia': '👨‍👩‍👧‍👦',
-    'miedo': '😱', 'alegría': '😄', 'tristeza': '😢', 'enfado': '😠', 'sorpresa': '😲',
-    'esperanza': '🌟', 'fe': '🙏', 'perdón': '🙏', 'venganza': 'venge', 'redención': '🙏',
-    'destino': '🔮', 'suerte': '🍀', 'milagro': '✨', 'magia': '✨', 'hechizo': '🧙',
-    'sueño': '💤', 'pesadilla': '😱', 'alucinación': '🤪', 'delirio': '🤪',
-    'locura': '🤪', 'razón': '🧠', 'verdad': '✅', 'mentira': '🤥', 'secreto': '🤫',
+    'alienígena': '👽', 'planeta': '🪐', 'tiempo': '⏳', 'pasado': '🕰️'
 }
 
 # --- Funciones de Formato de Texto ---
+
+
+def esc(value) -> str:
+    """Escapa texto para insertarlo de forma segura en captions HTML de Telegram."""
+    if value is None:
+        return ''
+    return html.escape(str(value))
 
 
 def get_genre_emojis(genres):
@@ -515,7 +352,7 @@ def get_synopsis_with_emojis(synopsis):
     return result.strip()
 
 
-def get_dynamic_closing():
+def get_dynamic_closing(_synopsis=None):
     return "🤖 Automatización creada por Charli AI, ofrecemos servicios generales de IA 🚀✨"
 
 
@@ -527,8 +364,8 @@ async def search_tvmaze(query: str):
     """Buscar en TVmaze API"""
     try:
         async with httpx.AsyncClient() as client:
-            url = f"https://api.tvmaze.com/search/shows?q={query}"
-            response = await client.get(url, timeout=10)
+            url = "https://api.tvmaze.com/search/shows"
+            response = await client.get(url, params={"q": query}, timeout=10)
             response.raise_for_status()
             data = response.json()
 
@@ -545,17 +382,18 @@ async def search_tvmaze(query: str):
         rating = show.get('rating', {}).get('average', 'N/D')
         genres = show.get('genres', [])
 
-        caption = f"📺 <b>{title} ({premiered[:4] if premiered else 'N/D'})</b>\n\n"
+        caption = f"📺✨ <b>{esc(title)} ({esc(premiered[:4]) if premiered else 'N/D'})</b> ✨📺\n"
+        caption += f"{SEP}\n"
         if summary:
-            caption += f"📝 <b>Sinopsis:</b>\n{get_synopsis_with_emojis(summary)}\n\n"
+            caption += f"📝 <b>Sinopsis:</b>\n{esc(get_synopsis_with_emojis(summary))}\n\n{SEP_SOFT}\n"
         if genres:
-            caption += f"🎞️ <b>Géneros:</b> {', '.join(genres)}\n"
+            caption += f"🎞️ <b>Géneros:</b> {esc(', '.join(genres))} {get_genre_emojis(genres)}\n"
         if rating != 'N/D':
-            caption += f"⭐️ <b>Calificación:</b> {rating}/10\n"
+            caption += f"⭐️ <b>Calificación:</b> {esc(rating)}/10\n"
         if premiered:
-            caption += f"📅 <b>Estreno:</b> {premiered}\n"
+            caption += f"📅 <b>Estreno:</b> {esc(premiered)}\n"
 
-        caption += f"\n{get_dynamic_closing()}{FIRME}"
+        caption += f"\n{SEP_STAR}\n{get_dynamic_closing()}{FIRME}"
 
         return image_url, caption
 
@@ -572,8 +410,9 @@ async def search_omdb(query: str):
         return None, None
     try:
         async with httpx.AsyncClient() as client:
-            url = f"https://www.omdbapi.com/?t={query}&apikey={OMDB_API_KEY}"
-            response = await client.get(url, timeout=10)
+            url = "https://www.omdbapi.com/"
+            response = await client.get(
+                url, params={"t": query, "apikey": OMDB_API_KEY}, timeout=10)
             response.raise_for_status()
             data = response.json()
 
@@ -591,20 +430,22 @@ async def search_omdb(query: str):
         director = data.get('Director', '')
         actors = data.get('Actors', '')
 
-        caption_parts = [f"🎬 <b>{title} ({year})</b>"]
+        caption_parts = [f"🎬🍿 <b>{esc(title)} ({esc(year)})</b> 🍿🎬", SEP]
         if plot and plot != 'N/A':
             caption_parts.append(
-                f"\n📝 <b>Sinopsis:</b>\n{get_synopsis_with_emojis(plot)}")
+                f"📝 <b>Sinopsis:</b>\n{esc(get_synopsis_with_emojis(plot))}\n\n{SEP_SOFT}")
+        if runtime and runtime != 'N/A':
+            caption_parts.append(f"⏱️ <b>Duración:</b> {esc(runtime)}")
         if director and director != 'N/A':
-            caption_parts.append(f"\n🎬 <b>Director:</b> {director}")
+            caption_parts.append(f"🎬 <b>Director:</b> {esc(director)}")
         if actors and actors != 'N/A':
-            caption_parts.append(f"\n🎭 <b>Reparto:</b> {actors}")
+            caption_parts.append(f"🎭 <b>Reparto:</b> {esc(actors)}")
         if genre and genre != 'N/A':
-            caption_parts.append(f"\n🎞️ <b>Géneros:</b> {genre}")
+            caption_parts.append(f"🎞️ <b>Géneros:</b> {esc(genre)}")
         if rating and rating != 'N/A':
-            caption_parts.append(f"\n⭐️ <b>Calificación IMDb:</b> {rating}/10")
+            caption_parts.append(f"⭐️ <b>Calificación IMDb:</b> {esc(rating)}/10")
 
-        caption_parts.append(f"\n{get_dynamic_closing()}{FIRME}")
+        caption_parts.append(f"\n{SEP_STAR}\n{get_dynamic_closing()}{FIRME}")
         caption = '\n'.join(caption_parts)
 
         return poster_url, caption
@@ -619,12 +460,17 @@ async def search_tmdb_and_show_options(update: Update,
                                        query: str):
     try:
         async with httpx.AsyncClient() as client:
-            url_movie = f'https://api.themoviedb.org/3/search/movie?api_key={TMDB_API_KEY}&query={query}&language=es-ES'
-            url_tv = f'https://api.themoviedb.org/3/search/tv?api_key={TMDB_API_KEY}&query={query}&language=es-ES'
+            params = {
+                "api_key": TMDB_API_KEY,
+                "query": query,
+                "language": "es-ES",
+            }
+            url_movie = 'https://api.themoviedb.org/3/search/movie'
+            url_tv = 'https://api.themoviedb.org/3/search/tv'
 
             r_movie, r_tv = await asyncio.gather(
-                client.get(url_movie, timeout=10),
-                client.get(url_tv, timeout=10))
+                client.get(url_movie, params=params, timeout=10),
+                client.get(url_tv, params=params, timeout=10))
             data_movie = r_movie.json()
             data_tv = r_tv.json()
             logger.info(f'TMDb movie: {data_movie}')
@@ -672,16 +518,24 @@ async def publish_tmdb_item(update: Update,
             if is_movie:
                 title = item.get('title', 'Sin título')
                 id_ = item['id']
-                details_url = f'https://api.themoviedb.org/3/movie/{id_}?api_key={TMDB_API_KEY}&language=es-ES&append_to_response=credits'
+                details_url = f'https://api.themoviedb.org/3/movie/{id_}'
             else:
                 title = item.get('name', 'Sin título')
                 id_ = item['id']
-                details_url = f'https://api.themoviedb.org/3/tv/{id_}?api_key={TMDB_API_KEY}&language=es-ES&append_to_response=credits'
+                details_url = f'https://api.themoviedb.org/3/tv/{id_}'
 
-            r = await client.get(details_url)
+            details_params = {
+                "api_key": TMDB_API_KEY,
+                "language": "es-ES",
+                "append_to_response": "credits,videos,watch/providers",
+            }
+            r = await client.get(details_url, params=details_params, timeout=10)
             details = r.json()
 
         overview = details.get('overview') or ''
+        tagline = details.get('tagline') or ''
+        original_title = details.get('original_title') or details.get('original_name') or ''
+        original_language = (details.get('original_language') or '').upper()
         genres_raw = details.get('genres') or []
         genres = [g['name'] for g in genres_raw if g and 'name' in g]
         genre_emojis = get_genre_emojis(genres)
@@ -690,7 +544,7 @@ async def publish_tmdb_item(update: Update,
         poster_url = f'https://image.tmdb.org/t/p/original{poster_path}' if poster_path else None
         release_date = details.get('release_date') or details.get(
             'first_air_date') or ''
-        
+
         runtime_val = details.get('runtime')
         episode_run_time = details.get('episode_run_time')
         if runtime_val:
@@ -700,7 +554,35 @@ async def publish_tmdb_item(update: Update,
         else:
             runtime = ""
 
+        # Datos específicos de series
+        num_seasons = details.get('number_of_seasons')
+        num_episodes = details.get('number_of_episodes')
+        status_raw = details.get('status') or ''
+        status_map = {
+            'Released': 'Estrenada ✅', 'Ended': 'Finalizada 🏁',
+            'Returning Series': 'En emisión 📡', 'In Production': 'En producción 🎬',
+            'Post Production': 'Postproducción 🎞️', 'Planned': 'Planeada 🗓️',
+            'Canceled': 'Cancelada ❌',
+        }
+        status = status_map.get(status_raw, status_raw)
+
+        # Presupuesto / recaudación (solo películas) y país de producción
+        budget = details.get('budget') or 0
+        revenue = details.get('revenue') or 0
+        countries_raw = details.get('production_countries') or []
+        countries = ', '.join(c.get('name') for c in countries_raw if c and c.get('name'))
+
+        def fmt_money(v):
+            try:
+                v = int(v)
+            except (TypeError, ValueError):
+                return ''
+            if v <= 0:
+                return ''
+            return f"${v:,.0f}".replace(',', '.')
+
         vote_average = details.get('vote_average')
+        vote_count = details.get('vote_count')
         credits = details.get('credits') or {}
         cast_list = credits.get('cast') or []
         cast = ', '.join([c['name'] for c in cast_list[:4] if c and 'name' in c])
@@ -710,46 +592,100 @@ async def publish_tmdb_item(update: Update,
             if c and c.get('job') in ['Director', 'Directora']:
                 director = c.get('name', '')
                 break
-        lines = [
-            f"{keyword_emojis} {genre_emojis} 🎬 <b>{title} ({release_date[:4] if release_date else 'N/D'})</b> 🎬 {keyword_emojis} {genre_emojis}",
-            f"🎬 Tipo: Película" if is_movie else "📺 Tipo: Serie"
-        ]
-        if overview:
-            lines.append(
-                f"\n📝 <b>Sinopsis:</b>\n{get_synopsis_with_emojis(overview)}")
-        if cast: lines.append(f"\n🎭 <b>Reparto:</b> {cast}")
-        if director: lines.append(f"\n🎬 <b>Dirección:</b> {director}")
-        if release_date: lines.append(f"\n📅 <b>Estreno:</b> {release_date}")
-        if vote_average:
-            lines.append(f"\n⭐️ <b>Calificación IMDb:</b> {vote_average}/10")
-        if genres:
-            lines.append(
-                f"\n🎞️ <b>Géneros:</b> {', '.join(genres)} {genre_emojis}")
-        lines.append(f"\n{get_dynamic_closing()}{FIRME}")
-        caption = '\n'.join(lines)
+
+        # Tráiler (YouTube) desde videos
+        trailer_url = ''
+        videos = (details.get('videos') or {}).get('results') or []
+        for v in videos:
+            if v.get('site') == 'YouTube' and v.get('type') in ('Trailer', 'Teaser'):
+                trailer_url = f"https://www.youtube.com/watch?v={v.get('key')}"
+                if v.get('type') == 'Trailer':
+                    break
+
+        # Plataformas de streaming (watch/providers)
+        providers_txt = ''
+        wp = (details.get('watch/providers') or {}).get('results') or {}
+        region = wp.get('ES') or wp.get('US') or wp.get('MX') or {}
+        flatrate = region.get('flatrate') or region.get('free') or []
+        if flatrate:
+            names = [p.get('provider_name') for p in flatrate[:4] if p.get('provider_name')]
+            if names:
+                providers_txt = ', '.join(names)
+
+        # Estrella visual según calificación
+        def rating_stars(v):
+            try:
+                full = int(round(float(v) / 2))
+            except (TypeError, ValueError):
+                return ''
+            full = max(0, min(5, full))
+            return '⭐' * full + '☆' * (5 - full)
+
+        def build_caption(ov):
+            lines = [
+                f"🎬🍿 {keyword_emojis} {genre_emojis}",
+                f"✨ <b>{esc(title)} ({esc(release_date[:4]) if release_date else 'N/D'})</b> ✨",
+            ]
+            if original_title and original_title.lower() != title.lower():
+                lines.append(f"🔤 <i>{esc(original_title)}</i>")
+            lines.append(SEP)
+            lines.append("🎬 <b>Tipo:</b> Película 🎞️" if is_movie else "📺 <b>Tipo:</b> Serie 📺")
+            if tagline:
+                lines.append(f"💬 <i>«{esc(tagline)}»</i>")
+            if ov:
+                lines.append(f"\n📝 <b>Sinopsis:</b>\n{esc(get_synopsis_with_emojis(ov))}")
+            lines.append(f"\n{SEP_SOFT}")
+            if cast:
+                lines.append(f"🎭 <b>Reparto:</b> {esc(cast)}")
+            if director:
+                lines.append(f"🎬 <b>Dirección:</b> {esc(director)}")
+            if release_date:
+                lines.append(f"📅 <b>Estreno:</b> {esc(release_date)}")
+            if runtime:
+                lines.append(f"⏱️ <b>Duración:</b> {esc(runtime)}")
+            if not is_movie and num_seasons:
+                temp_txt = f"📚 <b>Temporadas:</b> {esc(num_seasons)}"
+                if num_episodes:
+                    temp_txt += f"  •  🎞️ <b>Episodios:</b> {esc(num_episodes)}"
+                lines.append(temp_txt)
+            if original_language:
+                lines.append(f"🌐 <b>Idioma original:</b> {esc(original_language)}")
+            if countries:
+                lines.append(f"🏳️ <b>País:</b> {esc(countries)}")
+            if status:
+                lines.append(f"📌 <b>Estado:</b> {esc(status)}")
+            if is_movie:
+                b = fmt_money(budget)
+                rev = fmt_money(revenue)
+                if b:
+                    lines.append(f"💵 <b>Presupuesto:</b> {esc(b)}")
+                if rev:
+                    lines.append(f"🤑 <b>Recaudación:</b> {esc(rev)}")
+            if vote_average:
+                stars = rating_stars(vote_average)
+                count_txt = f" ({esc(vote_count)} votos)" if vote_count else ""
+                lines.append(f"⭐️ <b>Calificación:</b> {esc(vote_average)}/10 {stars}{count_txt}")
+            if genres:
+                lines.append(f"🎞️ <b>Géneros:</b> {esc(', '.join(genres))} {genre_emojis}")
+            if providers_txt:
+                lines.append(f"\n📺 <b>Dónde ver:</b> {esc(providers_txt)}")
+            if trailer_url:
+                lines.append(f"▶️ <a href='{esc(trailer_url)}'>🎬 Ver tráiler en YouTube</a>")
+            lines.append(f"\n{SEP_STAR}")
+            lines.append(f"{get_dynamic_closing()}{FIRME}")
+            return '\n'.join(lines)
+
+        caption = build_caption(overview)
 
         # --- TRUNCADO DE CAPTION PARA TELEGRAM (Límite 1024 caracteres) ---
         if poster_url and len(caption) > 1024:
             logger.warning(f"Caption demasiado larga ({len(caption)} chars). Truncando...")
-            # Intentar reducir la sinopsis primero
             if overview:
                 max_overview_len = 1024 - (len(caption) - len(overview)) - 10
                 if max_overview_len > 100:
                     truncated_overview = overview[:max_overview_len] + "..."
-                    # Regenerar caption con sinopsis truncada
-                    lines = []
-                    lines.append(f"{keyword_emojis} {genre_emojis} 🎬 <b>{title} ({release_date[:4] if release_date else 'N/D'})</b> 🎬 {keyword_emojis} {genre_emojis}")
-                    lines.append(f"🎬 Tipo: Película" if is_movie else "📺 Tipo: Serie")
-                    lines.append(f"\n📝 <b>Sinopsis:</b>\n{get_synopsis_with_emojis(truncated_overview)}")
-                    if cast: lines.append(f"\n🎭 <b>Reparto:</b> {cast}")
-                    if director: lines.append(f"\n🎬 <b>Dirección:</b> {director}")
-                    if release_date: lines.append(f"\n📅 <b>Estreno:</b> {release_date}")
-                    if vote_average: lines.append(f"\n⭐️ <b>Calificación IMDb:</b> {vote_average}/10")
-                    if genres: lines.append(f"\n🎞️ <b>Géneros:</b> {', '.join(genres)} {genre_emojis}")
-                    lines.append(f"\n{get_dynamic_closing()}{FIRME}")
-                    caption = '\n'.join(lines)
-            
-            # Si aún es demasiado larga, truncar a lo bruto
+                    caption = build_caption(truncated_overview)
+
             if len(caption) > 1024:
                 caption = caption[:1021] + "..."
 
@@ -791,9 +727,10 @@ async def search_danfra(query: str):
         image_url = f"https://www.danfra.com/{image_path}" if image_path else None
         page_url = f"https://www.danfra.com/serie/{slug}/" if item.get('tipo') == 'serie' else f"https://www.danfra.com/novela/{slug}/"
 
-        caption = f"🎬 <b>{title} (Danfra)</b>\n\n"
-        caption += f"🔗 <a href='{page_url}'>Ver en Danfra</a>\n"
-        caption += f"\n¡No te pierdas esta emocionante historia! 🚀{FIRME}"
+        caption = f"🎬✨ <b>{esc(title)}</b> ✨🎬\n"
+        caption += f"🌐 <i>Fuente: Danfra</i>\n{SEP}\n"
+        caption += f"🔗 <a href='{esc(page_url)}'>📺 Ver en Danfra</a>\n"
+        caption += f"\n🎉 ¡No te pierdas esta emocionante historia! 🚀🍿\n{SEP_STAR}{FIRME}"
 
         return image_url, caption
 
@@ -806,8 +743,9 @@ async def search_lamparaturca(query: str):
     """Buscar en Lamparaturca.com"""
     try:
         async with httpx.AsyncClient() as client:
-            url = f"https://lamparaturca.com/?s={query}"
-            response = await client.get(url, timeout=10)
+            url = "https://lamparaturca.com/"
+            response = await client.get(
+                url, params={"s": query}, timeout=10)
             response.raise_for_status()
             
         soup = BeautifulSoup(response.text, 'html.parser')
@@ -826,9 +764,10 @@ async def search_lamparaturca(query: str):
         img_tag = article.find('img')
         image_url = img_tag['src'] if img_tag else None
 
-        caption = f"🎬 <b>{title} (Lámpara Turca)</b>\n\n"
-        caption += f"🔗 <a href='{link}'>Ver en Lámpara Turca</a>\n"
-        caption += f"\n¡Una historia fascinante te espera! ✨{FIRME}"
+        caption = f"🎬✨ <b>{esc(title)}</b> ✨🎬\n"
+        caption += f"🌐 <i>Fuente: Lámpara Turca</i>\n{SEP}\n"
+        caption += f"🔗 <a href='{esc(link)}'>📺 Ver en Lámpara Turca</a>\n"
+        caption += f"\n💫 ¡Una historia fascinante te espera! ✨🍿\n{SEP_STAR}{FIRME}"
 
         return image_url, caption
 
@@ -895,17 +834,23 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     async with httpx.AsyncClient() as client:
         # Buscar en TMDb (películas)
-        url_movie = f'https://api.themoviedb.org/3/search/movie?api_key={TMDB_API_KEY}&query={name}&language=es-ES'
+        movie_params = {
+            "api_key": TMDB_API_KEY, "query": name, "language": "es-ES"}
         if year:
-            url_movie += f'&year={year}'
-        r_movie = await client.get(url_movie)
+            movie_params["year"] = year
+        r_movie = await client.get(
+            'https://api.themoviedb.org/3/search/movie',
+            params=movie_params, timeout=10)
         data_movie = r_movie.json().get('results', [])
 
         # Buscar en TMDb (series)
-        url_tv = f'https://api.themoviedb.org/3/search/tv?api_key={TMDB_API_KEY}&query={name}&language=es-ES'
+        tv_params = {
+            "api_key": TMDB_API_KEY, "query": name, "language": "es-ES"}
         if year:
-            url_tv += f'&first_air_date_year={year}'
-        r_tv = await client.get(url_tv)
+            tv_params["first_air_date_year"] = year
+        r_tv = await client.get(
+            'https://api.themoviedb.org/3/search/tv',
+            params=tv_params, timeout=10)
         data_tv = r_tv.json().get('results', [])
 
     # Combinar resultados y marcar tipo
