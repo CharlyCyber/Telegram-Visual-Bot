@@ -531,15 +531,13 @@ async def publish_tmdb_item(update: Update,
             details_params = {
                 "api_key": TMDB_API_KEY,
                 "language": "es-ES",
-                "append_to_response": "credits,videos,watch/providers",
+                "append_to_response": "credits,videos",
             }
             r = await client.get(details_url, params=details_params, timeout=10)
             details = r.json()
 
         overview = details.get('overview') or ''
         tagline = details.get('tagline') or ''
-        original_title = details.get('original_title') or details.get('original_name') or ''
-        original_language = (details.get('original_language') or '').upper()
         genres_raw = details.get('genres') or []
         genres = [g['name'] for g in genres_raw if g and 'name' in g]
         genre_emojis = get_genre_emojis(genres)
@@ -549,26 +547,9 @@ async def publish_tmdb_item(update: Update,
         release_date = details.get('release_date') or details.get(
             'first_air_date') or ''
 
-        runtime_val = details.get('runtime')
-        episode_run_time = details.get('episode_run_time')
-        if runtime_val:
-            runtime = f"{runtime_val} min"
-        elif episode_run_time and isinstance(episode_run_time, list) and len(episode_run_time) > 0:
-            runtime = f"{episode_run_time[0]} min"
-        else:
-            runtime = ""
-
         # Datos específicos de series
         num_seasons = details.get('number_of_seasons')
         num_episodes = details.get('number_of_episodes')
-        status_raw = details.get('status') or ''
-        status_map = {
-            'Released': 'Estrenada ✅', 'Ended': 'Finalizada 🏁',
-            'Returning Series': 'En emisión 📡', 'In Production': 'En producción 🎬',
-            'Post Production': 'Postproducción 🎞️', 'Planned': 'Planeada 🗓️',
-            'Canceled': 'Cancelada ❌',
-        }
-        status = status_map.get(status_raw, status_raw)
 
         # Presupuesto / recaudación (solo películas) y país de producción
         budget = details.get('budget') or 0
@@ -606,16 +587,6 @@ async def publish_tmdb_item(update: Update,
                 if v.get('type') == 'Trailer':
                     break
 
-        # Plataformas de streaming (watch/providers)
-        providers_txt = ''
-        wp = (details.get('watch/providers') or {}).get('results') or {}
-        region = wp.get('ES') or wp.get('US') or wp.get('MX') or {}
-        flatrate = region.get('flatrate') or region.get('free') or []
-        if flatrate:
-            names = [p.get('provider_name') for p in flatrate[:4] if p.get('provider_name')]
-            if names:
-                providers_txt = ', '.join(names)
-
         # Estrella visual según calificación
         def rating_stars(v):
             try:
@@ -630,8 +601,6 @@ async def publish_tmdb_item(update: Update,
                 f"🎬🍿 {keyword_emojis} {genre_emojis}",
                 f"✨ <b>{esc(title)} ({esc(release_date[:4]) if release_date else 'N/D'})</b> ✨",
             ]
-            if original_title and original_title.lower() != title.lower():
-                lines.append(f"🔤 <i>{esc(original_title)}</i>")
             lines.append(SEP)
             lines.append("🎬 <b>Tipo:</b> Película 🎞️" if is_movie else "📺 <b>Tipo:</b> Serie 📺")
             if tagline:
@@ -645,19 +614,13 @@ async def publish_tmdb_item(update: Update,
                 lines.append(f"🎬 <b>Dirección:</b> {esc(director)}")
             if release_date:
                 lines.append(f"📅 <b>Estreno:</b> {esc(release_date)}")
-            if runtime:
-                lines.append(f"⏱️ <b>Duración:</b> {esc(runtime)}")
             if not is_movie and num_seasons:
                 temp_txt = f"📚 <b>Temporadas:</b> {esc(num_seasons)}"
                 if num_episodes:
                     temp_txt += f"  •  🎞️ <b>Episodios:</b> {esc(num_episodes)}"
                 lines.append(temp_txt)
-            if original_language:
-                lines.append(f"🌐 <b>Idioma original:</b> {esc(original_language)}")
             if countries:
                 lines.append(f"🏳️ <b>País:</b> {esc(countries)}")
-            if status:
-                lines.append(f"📌 <b>Estado:</b> {esc(status)}")
             if is_movie:
                 b = fmt_money(budget)
                 rev = fmt_money(revenue)
@@ -671,8 +634,6 @@ async def publish_tmdb_item(update: Update,
                 lines.append(f"⭐️ <b>Calificación:</b> {esc(vote_average)}/10 {stars}{count_txt}")
             if genres:
                 lines.append(f"🎞️ <b>Géneros:</b> {esc(', '.join(genres))} {genre_emojis}")
-            if providers_txt:
-                lines.append(f"\n📺 <b>Dónde ver:</b> {esc(providers_txt)}")
             if trailer_url:
                 lines.append(f"▶️ <a href='{esc(trailer_url)}'>🎬 Ver tráiler en YouTube</a>")
             lines.append(f"\n{SEP_STAR}")
