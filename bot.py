@@ -47,7 +47,7 @@ TMDB_API_KEY = os.getenv("TMDB_API_KEY")
 OMDB_API_KEY = os.getenv("OMDB_API_KEY")  # Movido aquí para consistencia
 CHAT_ID = int(os.getenv("GROUP_CHAT_ID", "-1002700094661"))
 
-FIRME = os.getenv("SIGNATURE", "\n\n💻ANDY (el+lin2)🛠️🪛 📍Ave 3️⃣7️⃣ - #️⃣4️⃣2️⃣1️⃣1️⃣ ➗4️⃣2️⃣ y 4️⃣8️⃣ cerca del CVD 🏟️ 📌MAYABEQUE SAN JOSÉ")
+FIRME = "\n\n💻ANDY (el+lin2)🛠️🪛 📍Ave 3️⃣7️⃣ - #️⃣4️⃣2️⃣1️⃣1️⃣ ➗4️⃣2️⃣ y 4️⃣8️⃣ cerca del CVD 🏟️ 📌MAYABEQUE SAN JOSÉ"
 
 # Estados de la conversación
 SELECCIONANDO = 11
@@ -537,6 +537,22 @@ async def publish_tmdb_item(update: Update,
             details = r.json()
 
         overview = details.get('overview') or ''
+
+        # Fallback: si no hay sinopsis en español, intentar en inglés
+        if not overview:
+            try:
+                fallback_params = {
+                    "api_key": TMDB_API_KEY,
+                    "language": "en-US",
+                    "append_to_response": "credits,videos",
+                }
+                r2 = await client.get(details_url, params=fallback_params, timeout=10)
+                fallback_details = r2.json()
+                overview = fallback_details.get('overview') or ''
+                if 'tagline' not in details or not details.get('tagline'):
+                    details['tagline'] = fallback_details.get('tagline') or ''
+            except Exception as e:
+                logger.warning(f"No se pudo obtener fallback en inglés: {e}")
         tagline = details.get('tagline') or ''
         genres_raw = details.get('genres') or []
         genres = [g['name'] for g in genres_raw if g and 'name' in g]
@@ -578,15 +594,6 @@ async def publish_tmdb_item(update: Update,
                 director = c.get('name', '')
                 break
 
-        # Tráiler (YouTube) desde videos
-        trailer_url = ''
-        videos = (details.get('videos') or {}).get('results') or []
-        for v in videos:
-            if v.get('site') == 'YouTube' and v.get('type') in ('Trailer', 'Teaser'):
-                trailer_url = f"https://www.youtube.com/watch?v={v.get('key')}"
-                if v.get('type') == 'Trailer':
-                    break
-
         # Estrella visual según calificación
         def rating_stars(v):
             try:
@@ -607,6 +614,8 @@ async def publish_tmdb_item(update: Update,
                 lines.append(f"💬 <i>«{esc(tagline)}»</i>")
             if ov:
                 lines.append(f"\n📝 <b>Sinopsis:</b>\n{esc(get_synopsis_with_emojis(ov))}")
+            else:
+                lines.append(f"\n📝 <b>Sinopsis:</b>\n<i>Sin descripción disponible.</i>")
             lines.append(f"\n{SEP_SOFT}")
             if cast:
                 lines.append(f"🎭 <b>Reparto:</b> {esc(cast)}")
@@ -634,8 +643,6 @@ async def publish_tmdb_item(update: Update,
                 lines.append(f"⭐️ <b>Calificación:</b> {esc(vote_average)}/10 {stars}{count_txt}")
             if genres:
                 lines.append(f"🎞️ <b>Géneros:</b> {esc(', '.join(genres))} {genre_emojis}")
-            if trailer_url:
-                lines.append(f"▶️ <a href='{esc(trailer_url)}'>🎬 Ver tráiler en YouTube</a>")
             lines.append(f"\n{SEP_STAR}")
             lines.append(f"{get_dynamic_closing()}{FIRME}")
             return '\n'.join(lines)
@@ -652,7 +659,12 @@ async def publish_tmdb_item(update: Update,
                     caption = build_caption(truncated_overview)
 
             if len(caption) > 1024:
-                caption = caption[:1021] + "..."
+                signature = f"\n{SEP_STAR}\n{get_dynamic_closing()}{FIRME}"
+                max_body = 1024 - len(signature) - 3
+                if max_body > 0:
+                    caption = caption[:max_body] + "..." + signature
+                else:
+                    caption = caption[:1021] + "..."
 
         if poster_url:
             try:
