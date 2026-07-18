@@ -553,6 +553,23 @@ async def publish_tmdb_item(update: Update,
                     details['tagline'] = fallback_details.get('tagline') or ''
             except Exception as e:
                 logger.warning(f"No se pudo obtener fallback en inglés: {e}")
+
+        # Fallback 2: si sigue sin sinopsis, buscar en OMDb por IMDb ID
+        if not overview and OMDB_API_KEY:
+            imdb_id = details.get('imdb_id')
+            if imdb_id:
+                try:
+                    omdb_r = await client.get(
+                        "https://www.omdbapi.com/",
+                        params={"i": imdb_id, "apikey": OMDB_API_KEY},
+                        timeout=10)
+                    omdb_data = omdb_r.json()
+                    if omdb_data.get('Response') == 'True':
+                        plot = omdb_data.get('Plot')
+                        if plot and plot != 'N/A':
+                            overview = plot
+                except Exception as e:
+                    logger.warning(f"No se pudo obtener sinopsis de OMDb: {e}")
         tagline = details.get('tagline') or ''
         genres_raw = details.get('genres') or []
         genres = [g['name'] for g in genres_raw if g and 'name' in g]
