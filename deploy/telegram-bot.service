@@ -1,6 +1,8 @@
 [Unit]
 Description=Telegram Visual Bot
-After=network.target
+Wants=network-online.target
+After=network-online.target
+StartLimitIntervalSec=0
 
 [Service]
 Type=simple

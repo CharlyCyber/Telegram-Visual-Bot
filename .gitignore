@@ -5,3 +5,5 @@ logs/
 run/
 *.log
 tests/__pycache__/
+.venv/
+.pytest_cache/

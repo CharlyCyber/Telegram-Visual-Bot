@@ -1,0 +1,23 @@
+# El plan Starter es de pago: los servicios gratuitos pueden suspenderse.
+services:
+  - type: web
+    name: telegram-visual-bot
+    runtime: python
+    plan: starter
+    numInstances: 1
+    buildCommand: pip install -r requirements.txt
+    startCommand: ./start.sh
+    healthCheckPath: /health
+    # Tiempo para que Telegram cierre el long polling antes de terminar.
+    maxShutdownDelaySeconds: 35
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.12
+      - key: BOT_TOKEN
+        sync: false
+      - key: TMDB_API_KEY
+        sync: false
+      - key: OMDB_API_KEY
+        sync: false
+      - key: GROUP_CHAT_ID
+        sync: false
