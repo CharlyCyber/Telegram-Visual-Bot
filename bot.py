@@ -5,7 +5,6 @@ import httpx
 import re
 import logging
 import http.server
-import socketserver
 import threading
 from dotenv import load_dotenv
 from telegram import Update, ChatMember
@@ -946,10 +945,12 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 class HealthHandler(http.server.BaseHTTPRequestHandler):
     def do_GET(self):
         if self.path == '/health':
-            self.send_response(200)
-            self.send_header('Content-Type', 'text/plain')
+            app = self.server.application
+            ready = app.running and app.updater is not None and app.updater.running
+            self.send_response(200 if ready else 503)
+            self.send_header('Content-Type', 'text/plain; charset=utf-8')
             self.end_headers()
-            self.wfile.write(b'OK')
+            self.wfile.write(b'OK' if ready else b'Bot not ready')
         else:
             self.send_response(404)
             self.end_headers()
@@ -958,10 +959,17 @@ class HealthHandler(http.server.BaseHTTPRequestHandler):
         logger.debug(f"Health server: {format % args}")
 
 
-def _run_health_server():
+def _start_health_server(app):
+    # Vincular el puerto en el hilo principal: un fallo debe detener el proceso
+    # para que el supervisor lo reinicie, no dejar un bot sin monitoreo.
     port = int(os.environ.get('PORT', 10000))
-    server = socketserver.TCPServer(("", port), HealthHandler)
-    server.serve_forever()
+    server = http.server.ThreadingHTTPServer(("0.0.0.0", port), HealthHandler)
+    server.daemon_threads = True
+    server.application = app
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    logger.info("Health server escuchando en el puerto %s", server.server_port)
+    return server, thread
 
 
 def main() -> None:
@@ -970,11 +978,7 @@ def main() -> None:
         logger.critical(
             "Faltan variables de entorno críticas (BOT_TOKEN, TMDB_API_KEY). El bot no puede iniciar."
         )
-        return
-
-    health_thread = threading.Thread(target=_run_health_server, daemon=True)
-    health_thread.start()
-    logger.info("Health server iniciado...")
+        raise SystemExit(1)
 
     app = ApplicationBuilder().token(BOT_TOKEN).build()
 
@@ -994,8 +998,15 @@ def main() -> None:
     app.add_handler(CommandHandler('start', start))
     app.add_handler(conv_handler)
 
-    logger.info("Bot iniciado...")
-    app.run_polling()
+    server, health_thread = _start_health_server(app)
+    try:
+        logger.info("Iniciando bot con reconexión automática...")
+        # Reintentar también durante el arranque si Telegram no está disponible.
+        app.run_polling(bootstrap_retries=-1)
+    finally:
+        server.shutdown()
+        server.server_close()
+        health_thread.join(timeout=5)
 
 
 if __name__ == '__main__':
