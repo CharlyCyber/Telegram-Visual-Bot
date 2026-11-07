@@ -25,6 +25,9 @@ Bot inteligente de Telegram que busca y publica información de películas y ser
 ## 🚀 Instalación y Deployment
 
 ### Variables de Entorno Requeridas
+
+Puedes copiar `.env.example` a `.env` para ejecución local. En Render, configura
+las variables desde el panel del servicio.
 ```env
 BOT_TOKEN=tu_bot_token_aqui
 TMDB_API_KEY=tu_tmdb_api_key_aqui
@@ -143,10 +146,21 @@ supervisorctl -c supervisord.conf shutdown
 
 ## 🔧 Testing
 
-### Probar Sistema Anti-Spam
+### Ejecutar todas las pruebas
 ```bash
-python -m pytest tests/test_spam.py tests/test_formatting.py tests/test_runtime.py
+pip install -r requirements-dev.txt
+python -m pytest -q
 ```
+
+Las pruebas usan respuestas HTTP simuladas, sin tokens reales ni acceso a APIs.
+Incluyen búsquedas, fallbacks, errores, alertas, caché, ciclo de vida HTTP,
+formato, anti-spam y disponibilidad. Una petición externa no simulada hace fallar
+la prueba. Las pruebas asíncronas tienen assertions reales: no ocultan fallos
+retornando `False`.
+
+GitHub Actions ejecuta la suite en Python 3.11 y 3.12 con cada push y pull request.
+Para impedir merges con pruebas fallidas, configura además una regla de protección
+en GitHub que requiera estos checks; el workflow por sí solo no bloquea merges.
 
 ### Mensajes de Prueba
 - ❌ `"🚨 FREE ETH ALERT! 🚨"` → Detectado como spam
@@ -177,3 +191,44 @@ anteriores del bot y deja una sola instancia con ese token. No ejecutes
 - Revisa `BOT_TOKEN`, `TMDB_API_KEY` y los errores de arranque en los logs.
 - Un `/health` con 503 indica que el polling todavía no está listo.
 - Si usas VPS, comprueba que la máquina siga encendida y la unidad habilitada.
+
+## 🧩 Organización y fiabilidad
+
+`bot.py` es el punto de entrada; los componentes están en `visualbot/`:
+
+- `config.py`: configuración de entorno y constantes.
+- `handlers.py`: comandos, membresía y selección de resultados.
+- `providers.py`: TMDb, TVmaze, OMDb y fuentes alternativas.
+- `formatting.py` / `spam.py`: presentación y análisis de contenido. Las fichas
+  largas se acortan sin romper HTML, contando los emojis en unidades UTF-16.
+- `network.py` / `cache.py`: conexiones HTTP reutilizables y caché TTL/LRU.
+- `errors.py` / `logging_setup.py` / `health.py`: errores, logs y disponibilidad.
+
+**No hay cuotas ni límites de búsquedas por usuario.** Se mantiene la comprobación
+de membresía y el filtro de contenido spam. La caché limita únicamente el número
+de resultados guardados en memoria: hasta 256 entradas por función, durante
+5 minutos, con eliminación de entradas caducadas en la siguiente consulta y
+evicción de las menos usadas cuando se llena. Las excepciones no se cachean;
+los proveedores secundarios tampoco guardan resultados vacíos. Cada respuesta
+cacheada se copia para que una selección no modifique resultados de otra búsqueda.
+
+Las consultas a proveedores comparten un pool HTTP, con timeout y reintentos de
+conexión. Se cierra al apagar el bot. Los errores HTTP no se confunden con
+búsquedas vacías: se prueban las fuentes alternativas y, si no es posible
+completar la búsqueda, el manejador global informa al usuario. Los fallos no
+controlados se registran con su traceback; las claves conocidas y los tokens en
+URLs se ocultan. No publiques los logs sin revisarlos, pues pueden contener
+identificadores de usuario y datos del servicio.
+
+### Alertas opcionales al administrador
+
+Añade `ADMIN_CHAT_ID` a las variables del servicio o a tu `.env` con el ID del
+chat que recibirá las alertas. Si es un chat privado, abre antes una conversación
+con el bot; si es un grupo, añade el bot y dale permiso para enviar mensajes.
+Sin esta variable, el bot sigue funcionando sin alertas al administrador.
+
+El bot avisa tras **3 fallos no controlados en 5 minutos**, con una separación
+mínima de 5 minutos entre alertas. Esta agrupación solo afecta a los avisos del
+administrador, **no al uso del bot**. No incluye mensajes de usuarios, claves ni
+el contenido de excepciones en la alerta. Si Telegram está caído, la alerta
+puede no llegar: revisa también los logs del alojamiento.
