@@ -7,6 +7,7 @@ from telegram.ext import ContextTypes, ConversationHandler
 
 from .config import CHAT_ID, SELECCIONANDO
 from .spam import is_spam_message
+from .result_labels import send_options
 from .web_catalogs import search_official_web, publish_web_item
 from .providers import (search_catalog, search_tvmaze, search_omdb, search_danfra,
                         search_lamparaturca, publish_tmdb_item, ProviderError)
@@ -92,11 +93,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 return ConversationHandler.END
             if web_options:
                 context.user_data['options'] = web_options
-                lines = ['Encontré estas fichas oficiales. Responde con el número de la opción:\n']
-                for idx, item in enumerate(web_options, 1):
-                    date = f" ({item['year']})" if item['year'] else ''
-                    lines.append(f"{idx}. {item['title']}{date} · {item['source']}")
-                await update.message.reply_text('\n'.join(lines))
+                await send_options(update.message, web_options,
+                                   'Encontré estas fichas oficiales. Responde con el número de la opción:')
                 return SELECCIONANDO
         if not caption and failures:
             raise ProviderError("No se pudo completar la búsqueda en los proveedores") from failures[-1]
@@ -118,18 +116,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Si hay más de una coincidencia, mostrar opciones
     if len(combined) > 1:
         context.user_data['options'] = combined
-        msg = 'Se encontraron varias coincidencias. Responde con el número de la opción que deseas publicar:\n\n'
-        for idx, item in enumerate(combined, 1):
-            if item['__type'] == 'movie':
-                title = item.get('title', 'Sin título')
-                date = item.get('release_date', '')
-                tipo = '🎬 Película'
-            else:
-                title = item.get('name', 'Sin título')
-                date = item.get('first_air_date', '')
-                tipo = '📺 Serie'
-            msg += f"{idx}. {title} ({date[:4]}) {tipo}\n"
-        await update.message.reply_text(msg)
+        await send_options(update.message, combined,
+                           'Se encontraron varias coincidencias. Responde con el número de la opción que deseas publicar:')
         logger.info(f"Cambiando a estado SELECCIONANDO para usuario {update.message.from_user.id}")
         return SELECCIONANDO
 

@@ -12,6 +12,7 @@ from .config import TMDB_API_KEY, OMDB_API_KEY, FIRME, SEP, SEP_SOFT, SEP_STAR
 from .formatting import (esc, get_genre_emojis,
                          get_synopsis_with_emojis, get_dynamic_closing, render_tmdb_caption)
 from .network import shared_client
+from .result_labels import send_options, identity_fields, country_text
 
 logger = logging.getLogger(__name__)
 
@@ -45,6 +46,8 @@ async def search_tvmaze(query: str):
 
         caption = f"📺✨ <b>{esc(title)} ({esc(premiered[:4]) if premiered else 'N/D'})</b> ✨📺\n"
         caption += f"{SEP}\n"
+        for label, value in identity_fields(dict(show, __type='tv'), title):
+            caption += f"<b>{esc(label)}:</b> {esc(value)}\n"
         if summary:
             caption += f"📝 <b>Sinopsis:</b>\n{esc(get_synopsis_with_emojis(summary))}\n\n{SEP_SOFT}\n"
         if genres:
@@ -91,6 +94,12 @@ async def search_omdb(query: str):
         actors = data.get('Actors', '')
 
         caption_parts = [f"🎬🍿 <b>{esc(title)} ({esc(year)})</b> 🍿🎬", SEP]
+        country = country_text([name.strip() for name in data.get('Country', '').split(',')])
+        if country:
+            caption_parts.append(f"🌍 <b>País:</b> {esc(country)}")
+        if data.get('Type') in ('movie', 'series'):
+            for label, value in identity_fields({'__type': 'movie' if data['Type'] == 'movie' else 'tv'}, title):
+                caption_parts.append(f"<b>{esc(label)}:</b> {esc(value)}")
         if plot and plot != 'N/A':
             caption_parts.append(
                 f"📝 <b>Sinopsis:</b>\n{esc(get_synopsis_with_emojis(plot))}\n\n{SEP_SOFT}")
@@ -131,13 +140,8 @@ async def search_tmdb_and_show_options(update: Update,
 
         # Mostrar opciones
         context.user_data['matches'] = results
-        msg = 'Se encontraron varias coincidencias. Responde con el número de la opción que deseas publicar:\n\n'
-        for idx, item in enumerate(results, 1):
-            title = item.get('title') or item.get('name', 'Sin título')
-            date = item.get('release_date') or item.get('first_air_date', '')
-            tipo = 'Película' if item['is_movie'] else 'Serie'
-            msg += f"{idx}. {title} ({date[:4] if date else 'N/D'}) [{tipo}]\n"
-        await update.message.reply_text(msg)
+        await send_options(update.message, results,
+                           'Se encontraron varias coincidencias. Responde con el número de la opción que deseas publicar:')
         return True
 
     except (httpx.HTTPError, ValueError) as e:
@@ -202,7 +206,7 @@ async def publish_tmdb_item(update: Update,
                 except (httpx.HTTPError, ValueError, KeyError, TypeError, AttributeError, IndexError) as e:
                     logger.warning(f"No se pudo obtener sinopsis de OMDb: {e}")
 
-    poster_url, caption = render_tmdb_caption(title, details, is_movie, overview)
+    poster_url, caption = render_tmdb_caption(title, dict(item, **details), is_movie, overview)
 
     if poster_url:
         try:

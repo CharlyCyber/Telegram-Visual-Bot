@@ -320,3 +320,38 @@ reemplaza revisar las condiciones de uso de cada fuente, especialmente si vas
 a comercializar el servicio. No se añaden sitios indiscriminadamente solo por
 ser conocidos: una página inaccesible o sin catálogo utilizable no es una fuente
 fiable para este bot.
+
+## 🏷️ Identificar resultados con títulos parecidos
+
+Las opciones numéricas muestran, cuando la fuente aporta los datos:
+
+- Tipo: película, serie, telenovela, reality, programa de entrevistas, documental
+  o animación. Se usa una categoría genérica si no hay información suficiente.
+- País(es) de origen, con bandera y nombres habituales traducidos al español.
+- Título original, si difiere del título mostrado.
+- Otros títulos, únicamente si la fuente los declara explícitamente.
+
+Ejemplo ilustrativo de formato (no una identificación verificada de una obra):
+
+```text
+1. El secreto (2025) · 📺 Telenovela · 🇹🇷 Turquía
+   Título original: [nombre original proporcionado por la fuente]
+```
+
+En TMDb se aprovechan `origin_country`, `original_name`/`original_title` y los
+identificadores de géneros ya incluidos en los resultados. No se hacen consultas
+adicionales por cada opción, ni se altera la numeración o la selección. Las listas
+largas se reparten en varios mensajes sin exceder el límite de Telegram.
+Las fichas publicadas también incluyen estos datos antes de la sinopsis cuando
+están disponibles; el país de producción se identifica separadamente.
+
+En los catálogos HTML, el origen se toma de `countryOfOrigin` del JSON-LD y el
+tipo de sus metadatos de la obra. Los nombres alternativos declarados se conservan.
+En OMDb se muestra el país que la fuente declara; en TVmaze se aprovecha el tipo
+de programa, pero **el país del canal emisor no se usa como país de origen**.
+
+No se deduce que una obra sea turca por su idioma, por su título ni por aparecer
+en Lámpara Turca, Telemundo u otra plataforma. Tampoco se transforma cualquier
+serie de Turquía en «telenovela»: hace falta una clasificación explícita (por
+ejemplo, género Soap). Si falta el país, simplemente no se muestra. Esta mejora
+no crea equivalencias automáticas entre títulos: solo muestra los datos recibidos.
