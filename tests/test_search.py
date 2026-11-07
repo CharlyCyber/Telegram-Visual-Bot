@@ -132,6 +132,70 @@ async def test_multiple_searches_have_no_user_quota(conversation, monkeypatch):
     monkeypatch.setattr(handlers, 'search_catalog', search)
     for name in ('search_tvmaze', 'search_omdb', 'search_danfra', 'search_lamparaturca'):
         monkeypatch.setattr(handlers, name, AsyncMock(return_value=(None, None)))
+    monkeypatch.setattr(handlers, 'search_official_web', AsyncMock(return_value=[]))
     for _ in range(20):
         await handlers.handle_message(*conversation)
     assert search.await_count == 20
+
+
+async def _empty_legacy_sources(monkeypatch):
+    monkeypatch.setattr(handlers, 'search_catalog', AsyncMock(return_value=[]))
+    for name in ('search_tvmaze', 'search_omdb', 'search_danfra', 'search_lamparaturca'):
+        monkeypatch.setattr(handlers, name, AsyncMock(return_value=(None, None)))
+
+
+def _web_item(title, year='2004'):
+    return {'__type': 'web', 'title': title, 'year': year, 'source': 'Las Estrellas',
+            'description': 'Una novela', 'url': 'https://www.lasestrellas.tv/telenovelas/rubi', 'image': None}
+
+
+async def test_existing_hit_does_not_query_new_sites(conversation, monkeypatch):
+    await _empty_legacy_sources(monkeypatch)
+    monkeypatch.setattr(handlers, 'search_tvmaze', AsyncMock(return_value=(None, 'Existing caption')))
+    web_search = AsyncMock()
+    monkeypatch.setattr(handlers, 'search_official_web', web_search)
+    await handlers.handle_message(*conversation)
+    web_search.assert_not_awaited()
+
+
+async def test_official_single_result_publishes_after_legacy_misses(conversation, monkeypatch):
+    await _empty_legacy_sources(monkeypatch)
+    item = _web_item('Rubí')
+    web_search = AsyncMock(return_value=[item])
+    publish = AsyncMock()
+    monkeypatch.setattr(handlers, 'search_official_web', web_search)
+    monkeypatch.setattr(handlers, 'publish_web_item', publish)
+    update, context = conversation
+    update.message.text = 'Rubí 2004'
+    await handlers.handle_message(update, context)
+    web_search.assert_awaited_once_with('Rubí', '2004')
+    publish.assert_awaited_once_with(context, item)
+
+
+async def test_official_options_use_existing_selection_flow(conversation, monkeypatch):
+    await _empty_legacy_sources(monkeypatch)
+    items = [_web_item('Rubí', '2004'), _web_item('Rubí', '2020')]
+    monkeypatch.setattr(handlers, 'search_official_web', AsyncMock(return_value=items))
+    publish = AsyncMock()
+    tmdb_publish = AsyncMock()
+    monkeypatch.setattr(handlers, 'publish_web_item', publish)
+    monkeypatch.setattr(handlers, 'publish_tmdb_item', tmdb_publish)
+    update, context = conversation
+    update.message.text = 'Rubí'
+    assert await handlers.handle_message(update, context) == handlers.SELECCIONANDO
+    assert context.user_data['options'] == items
+    assert 'Las Estrellas' in update.message.reply_text.call_args.args[0]
+    update.message.text = '2'
+    assert await handlers.select_option(update, context) == -1
+    publish.assert_awaited_once_with(context, items[1])
+    tmdb_publish.assert_not_awaited()
+    assert not context.user_data
+
+
+async def test_short_number_in_title_is_not_a_release_year(conversation, monkeypatch):
+    await _empty_legacy_sources(monkeypatch)
+    monkeypatch.setattr(handlers, 'search_official_web', AsyncMock(return_value=[]))
+    update, context = conversation
+    update.message.text = 'Acacias 38'
+    await handlers.handle_message(update, context)
+    handlers.search_catalog.assert_awaited_once_with('Acacias 38', None)

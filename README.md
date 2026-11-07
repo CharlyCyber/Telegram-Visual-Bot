@@ -232,3 +232,91 @@ mínima de 5 minutos entre alertas. Esta agrupación solo afecta a los avisos de
 administrador, **no al uso del bot**. No incluye mensajes de usuarios, claves ni
 el contenido de excepciones en la alerta. Si Telegram está caído, la alerta
 puede no llegar: revisa también los logs del alojamiento.
+
+## 🌐 Fuentes oficiales adicionales sin API (especialmente novelas)
+
+Las búsquedas existentes conservan su prioridad y su comportamiento. Si TMDb y
+los respaldos actuales no encuentran una ficha, se consulta una capa adicional
+que lee **catálogos HTML públicos**, sin claves nuevas, APIs privadas, buscadores
+externos ni navegador automatizado. El JSON-LD que algunas páginas incluyen en
+su propio HTML se usa como metadatos, no como un endpoint de API.
+
+| Fuente nueva | Catálogos consultados / cobertura orientativa |
+|---|---|
+| [Telemundo](https://www.telemundo.com/shows) | Novelas latinas y turcas de su catálogo, series, shows y realities. |
+| [Las Estrellas](https://www.lasestrellas.tv/telenovelas) | Telenovelas de su catálogo público. |
+| [Caracol TV](https://www.caracoltv.com/programas) | Novelas, series, entretenimiento y concursos. |
+| [RTVE Play](https://www.rtve.es/play/colecciones/telenovelas/229/) | Novelas, [archivo](https://www.rtve.es/play/colecciones/play-archivo-novelas/275/), series, documentales y programas con ficha propia. |
+| [Globoplay](https://globoplay.globo.com/categorias/novelas/) | Novelas brasileñas, colecciones 2000/2020, series y películas. Metadatos en el idioma original, normalmente portugués. |
+| [Atresplayer](https://www.atresplayer.com/series/) | Series, novelas y programas enlazados en sus catálogos públicos. |
+
+No se anuncia una cobertura universal: solo se encuentran obras **enlazadas en
+las páginas de catálogo configuradas** y con metadatos recuperables sin ejecutar
+JavaScript. No se recorren todas las páginas, temporadas o paginaciones. No se
+inventan enlaces, traducciones de títulos, sinopsis ni años. Los nombres
+alternativos se usan cuando la propia fuente los proporciona. Si buscas un año
+concreto, se exige una fecha de estreno identificable y coincidente; una ficha
+sin año no se presenta como si correspondiera a esa versión.
+
+### Compatibilidad y uso
+
+- Orden: TMDb → TVmaze → OMDb → Danfra → Lámpara Turca → catálogos oficiales.
+  Un acierto en las fuentes anteriores **no hace peticiones** a las nuevas.
+- Una ficha oficial se publica en el grupo configurado; varias coincidencias se
+  muestran para elegir con el mismo sistema numérico ya existente. Se eliminan
+  duplicados, conservando versiones con años diferentes.
+- Se comprueba el título y se descartan rutas de noticias/capítulos y metadatos
+  editoriales o de episodios. Una ficha sin título pertinente y descripción no
+  se publica. Son filtros conservadores, no una garantía absoluta de identidad.
+- Las fichas incluyen atribución y enlace oficial. Las imágenes se aceptan solo
+  de dominios/CDN configurados; si la imagen falla, se envía texto.
+- La disponibilidad del vídeo en un país, una suscripción o los derechos de
+  distribución **no se deducen** de que exista la ficha. El bot no descarga ni
+  redistribuye vídeos.
+
+### Configuración opcional
+
+Sin `WEB_SOURCES`, se habilitan las seis fuentes. Para seleccionar algunas:
+
+```env
+WEB_SOURCES=telemundo,las_estrellas,caracol,rtve,globoplay,atresplayer
+```
+
+Usa `WEB_SOURCES=none` para desactivar únicamente esta nueva capa y volver al
+comportamiento previo. No hacen falta nuevas claves. Las APIs ya existentes
+siguen funcionando como antes y mantienen sus requisitos de configuración.
+
+### Protección de fuentes y estabilidad
+
+Se consulta y cachea `robots.txt`; si prohíbe el acceso o no se puede verificar,
+se omite el sitio (un 404 de robots se interpreta como ausencia de restricciones).
+Se respetan reglas con comodines, el agente específico y `Crawl-delay`, con al
+menos un segundo entre solicitudes del mismo dominio. No se sortean CAPTCHAs,
+logins, bloqueos regionales ni protecciones anti-bot. Un bloqueo 403/429/503
+activa una pausa temporal del dominio; otros proveedores siguen disponibles.
+
+Hay comprobación de dominios y redirecciones antes de seguirlas, límites de
+tamaño de respuesta, timeout por solicitud y un presupuesto global de **28
+segundos para esta capa adicional**. Se conservan los resultados completados y
+se cancelan las consultas pendientes. Por defecto se muestran hasta 8 fichas y
+se examinan hasta 3 candidatos por página. Esto limita trabajo por búsqueda,
+**no el número de búsquedas que puede hacer un usuario**.
+
+Se cachean políticas durante 5 minutos, HTML durante 15 minutos (hasta 64 páginas)
+y búsquedas oficiales con resultados durante 5 minutos (hasta 128 entradas).
+Los fallos no se guardan como resultados de búsqueda. Las fuentes opcionales
+caídas o bloqueadas no generan por sí solas un fallo global del bot.
+
+**Verificación:** se revisaron páginas públicas de catálogo y robots durante el
+desarrollo. Las pruebas automáticas de los adaptadores usan HTML sintético y
+HTTP simulado; no constituyen una prueba en vivo de cada sitio desde el servidor
+del bot. Antes de desplegar, verifica desde tu alojamiento búsquedas concretas
+(por ejemplo, `Pasión de Gavilanes`, `Rubí`, `La Promesa`, `Rosalinda`), los logs y
+los permisos de uso. No se garantiza que cada ejemplo se resuelva en cada país.
+Las estructuras web y las restricciones pueden cambiar.
+
+Respetar robots **no concede licencia** para reutilizar textos o imágenes ni
+reemplaza revisar las condiciones de uso de cada fuente, especialmente si vas
+a comercializar el servicio. No se añaden sitios indiscriminadamente solo por
+ser conocidos: una página inaccesible o sin catálogo utilizable no es una fuente
+fiable para este bot.
