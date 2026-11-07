@@ -9,6 +9,7 @@ from supervisor.datatypes import RestartUnconditionally
 from supervisor.options import ServerOptions
 
 import bot
+from visualbot import health
 
 
 @pytest.fixture
@@ -67,7 +68,7 @@ def test_polling_retries_and_cleans_up(monkeypatch, polling_error):
     monkeypatch.setattr(bot, 'TMDB_API_KEY', 'test-key')
     app = Mock()
     builder = Mock()
-    builder.token.return_value.build.return_value = app
+    builder.token.return_value.post_init.return_value.post_shutdown.return_value.build.return_value = app
     monkeypatch.setattr(bot, 'ApplicationBuilder', lambda: builder)
     server, thread = Mock(), Mock()
     monkeypatch.setattr(bot, '_start_health_server', lambda _: (server, thread))
@@ -77,6 +78,9 @@ def test_polling_retries_and_cleans_up(monkeypatch, polling_error):
             bot.main()
     else:
         bot.main()
+    app.add_error_handler.assert_called_once_with(bot.handle_error)
+    builder.token.return_value.post_init.assert_called_once_with(bot.initialize_http)
+    builder.token.return_value.post_init.return_value.post_shutdown.assert_called_once_with(bot.shutdown_http)
     app.run_polling.assert_called_once_with(bootstrap_retries=-1)
     server.shutdown.assert_called_once_with()
     server.server_close.assert_called_once_with()
@@ -87,7 +91,7 @@ def test_port_binding_failure_is_not_silent(monkeypatch):
     monkeypatch.setenv('PORT', '0')
     def fail(*args):
         raise OSError('port unavailable')
-    monkeypatch.setattr(bot.http.server, 'ThreadingHTTPServer', fail)
+    monkeypatch.setattr(health.http.server, 'ThreadingHTTPServer', fail)
     with pytest.raises(OSError, match='port unavailable'):
         bot._start_health_server(Mock())
 

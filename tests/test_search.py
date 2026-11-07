@@ -1,156 +1,137 @@
-#!/usr/bin/env python3
-"""
-Test Spanish search functionality for the Telegram bot
-Tests the specific requirement: search for "Matrix" in Spanish
-"""
+"""Pruebas deterministas de búsquedas; no usan credenciales ni APIs reales."""
+from types import SimpleNamespace
+from unittest.mock import AsyncMock
+import httpx
+import pytest
+from visualbot import handlers, providers
 
-import asyncio
-import sys
-import os
-from dotenv import load_dotenv
 
-# Load environment variables
-load_dotenv()
+@pytest.fixture
+def conversation():
+    message = SimpleNamespace(text='Matrix', from_user=SimpleNamespace(id=123),
+                              reply_text=AsyncMock(), reply_photo=AsyncMock())
+    update = SimpleNamespace(message=message)
+    context = SimpleNamespace(user_data={}, bot=SimpleNamespace(
+        get_chat_member=AsyncMock(return_value=SimpleNamespace(status='member')),
+        send_photo=AsyncMock(), send_message=AsyncMock()))
+    return update, context
 
-# Add current directory to path to import bot functions
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-async def test_spanish_matrix_search():
-    """Test searching for Matrix in Spanish using bot functions"""
-    print("🎬 Testing Spanish Search: 'Matrix'")
-    print("=" * 50)
-    
-    try:
-        # Import bot functions
-        from bot import search_tmdb_and_show_options, search_tvmaze, search_omdb
-        
-        # Create a mock update object for testing
-        class MockMessage:
-            def __init__(self):
-                pass
-            async def reply_text(self, text):
-                print(f"📱 Bot would reply: {text[:100]}...")
-                return True
-            async def reply_photo(self, photo, caption, parse_mode=None):
-                print(f"📸 Bot would send photo: {photo}")
-                print(f"📝 With caption: {caption[:100]}...")
-                return True
-        
-        class MockUpdate:
-            def __init__(self):
-                self.message = MockMessage()
-        
-        class MockContext:
-            def __init__(self):
-                self.user_data = {}
-        
-        # Test TMDb search for Matrix
-        print("\n🔍 Testing TMDb search for 'Matrix'...")
-        mock_update = MockUpdate()
-        mock_context = MockContext()
-        
-        # This will test the actual search function
-        result = await search_tmdb_and_show_options(mock_update, mock_context, "Matrix")
-        
-        if result:
-            print("✅ TMDb search successful")
-            if mock_context.user_data.get('matches'):
-                print(f"📊 Found {len(mock_context.user_data['matches'])} matches (multiple options)")
-            else:
-                print("📊 Found single match (auto-published)")
-        else:
-            print("❌ TMDb search failed, testing fallback APIs...")
-            
-            # Test TVmaze fallback
-            print("\n🔍 Testing TVmaze fallback...")
-            poster, caption = await search_tvmaze("Matrix")
-            if caption:
-                print("✅ TVmaze fallback successful")
-                print(f"📝 Caption preview: {caption[:100]}...")
-            else:
-                print("❌ TVmaze fallback failed")
-                
-                # Test OMDb fallback
-                print("\n🔍 Testing OMDb fallback...")
-                poster, caption = await search_omdb("Matrix")
-                if caption:
-                    print("✅ OMDb fallback successful")
-                    print(f"📝 Caption preview: {caption[:100]}...")
-                else:
-                    print("❌ All search methods failed")
-                    return False
-        
-        return True
-        
-    except Exception as e:
-        print(f"💥 Error during search test: {e}")
-        return False
+async def test_spanish_matrix_search(api, conversation):
+    def respond(request):
+        assert request.url.params['language'] == 'es-ES'
+        assert request.url.params['query'] == 'Matrix'
+        results = [{'id': 1, 'title': 'Matrix', 'release_date': '1999-03-31'},
+                   {'id': 2, 'title': 'Matrix Reloaded', 'release_date': '2003-05-15'}]
+        return httpx.Response(200, json={'results': results if request.url.path.endswith('movie') else []})
+    requests = api(respond)
+    update, context = conversation
+    assert await providers.search_tmdb_and_show_options(update, context, 'Matrix') is True
+    assert len(requests) == 2
+    assert len(context.user_data['matches']) == 2
+    assert 'Matrix (1999)' in update.message.reply_text.call_args.args[0]
 
-async def test_message_formatting():
-    """Test message formatting with Spanish content"""
-    print("\n🎨 Testing Message Formatting")
-    print("=" * 30)
-    
-    try:
-        from bot import get_genre_emojis, get_keyword_emojis, get_synopsis_with_emojis, get_dynamic_closing
-        
-        # Test with Spanish genres
-        spanish_genres = ['Acción', 'Ciencia ficción', 'Aventura']
-        genre_emojis = get_genre_emojis(spanish_genres)
-        print(f"🎭 Genre emojis: {genre_emojis}")
-        
-        # Test with Matrix title
-        title = "Matrix"
-        keyword_emojis = get_keyword_emojis(title)
-        print(f"🔑 Keyword emojis: {keyword_emojis}")
-        
-        # Test with Spanish synopsis
-        synopsis = "Un programador descubre que la realidad es una simulación y debe luchar contra las máquinas"
-        synopsis_with_emojis = get_synopsis_with_emojis(synopsis)
-        print(f"📝 Synopsis with emojis: {synopsis_with_emojis[:100]}...")
-        
-        # Test dynamic closing
-        closing = get_dynamic_closing(synopsis)
-        print(f"🎬 Dynamic closing: {closing}")
-        
-        return True
-        
-    except Exception as e:
-        print(f"💥 Error during formatting test: {e}")
-        return False
 
-async def main():
-    """Run Spanish search tests"""
-    print("🤖 Spanish Search Test for Telegram Bot")
-    print("=" * 50)
-    
-    # Test 1: Spanish Matrix search
-    search_success = await test_spanish_matrix_search()
-    
-    # Test 2: Message formatting
-    format_success = await test_message_formatting()
-    
-    # Summary
-    print("\n" + "=" * 50)
-    print("📊 SPANISH SEARCH TEST SUMMARY")
-    print("=" * 50)
-    
-    if search_success and format_success:
-        print("✅ All Spanish search tests passed!")
-        print("🎯 Bot is ready for Spanish movie/series searches")
-        return 0
-    else:
-        print("❌ Some tests failed")
-        print("🔧 Check the errors above")
-        return 1
+async def test_catalog_year_cache_and_mutation_isolation(api):
+    def respond(request):
+        params = request.url.params
+        is_movie = request.url.path.endswith('movie')
+        assert params['year' if is_movie else 'first_air_date_year'] == '1999'
+        return httpx.Response(200, json={'results': [{'id': 1}] if is_movie else []})
+    requests = api(respond)
+    result = await providers.search_catalog('Matrix', '1999')
+    assert result[0]['__type'] == 'movie'
+    result[0]['id'] = 999
+    assert (await providers.search_catalog('Matrix', '1999'))[0]['id'] == 1
+    assert len(requests) == 2
 
-if __name__ == "__main__":
-    try:
-        exit_code = asyncio.run(main())
-        sys.exit(exit_code)
-    except KeyboardInterrupt:
-        print("\n⚠️ Tests interrupted by user")
-        sys.exit(1)
-    except Exception as e:
-        print(f"\n💥 Unexpected error: {e}")
-        sys.exit(1)
+
+async def test_single_match_publishes_without_options(api, conversation):
+    def respond(request):
+        if '/search/' in request.url.path:
+            return httpx.Response(200, json={'results': [{'id': 1, 'title': 'Matrix'}]
+                if request.url.path.endswith('movie') else []})
+        return httpx.Response(200, json={'overview': 'Un programador descubre una simulación',
+                                        'release_date': '1999-03-31'})
+    api(respond)
+    update, context = conversation
+    await handlers.handle_message(update, context)
+    assert 'options' not in context.user_data
+    assert 'Matrix' in update.message.reply_text.call_args.kwargs['text']
+
+
+@pytest.mark.parametrize('status', [401, 429, 500])
+async def test_tmdb_http_errors_are_not_empty_results(api, conversation, status):
+    api(lambda _: httpx.Response(status, json={'status_message': 'unavailable'}))
+    with pytest.raises(providers.ProviderError):
+        await providers.search_tmdb_and_show_options(*conversation, 'Matrix')
+
+
+async def test_tvmaze_html_and_cache(api):
+    requests = api(lambda _: httpx.Response(200, json=[{'show': {
+        'name': 'Tom & Jerry', 'summary': '<p>Amor & aventura</p>',
+        'premiered': '2020-01-01', 'genres': ['Animación']}}]))
+    _, caption = await providers.search_tvmaze('Tom')
+    assert 'Tom &amp; Jerry' in caption
+    assert 'Amor' in caption
+    assert await providers.search_tvmaze('Tom') == (None, caption)
+    assert len(requests) == 1
+
+
+async def test_failed_provider_is_not_cached(api):
+    attempt = 0
+    def respond(_):
+        nonlocal attempt
+        attempt += 1
+        return httpx.Response(503) if attempt == 1 else httpx.Response(200, json=[{'show': {'name': 'Matrix'}}])
+    api(respond)
+    with pytest.raises(providers.ProviderError):
+        await providers.search_tvmaze('Matrix')
+    assert (await providers.search_tvmaze('Matrix'))[1]
+    assert attempt == 2
+
+
+async def test_primary_failure_uses_backup(api, conversation):
+    def respond(request):
+        if request.url.host == 'api.tvmaze.com':
+            return httpx.Response(200, json=[{'show': {'name': 'Matrix'}}])
+        return httpx.Response(503)
+    api(respond)
+    update, context = conversation
+    await handlers.handle_message(update, context)
+    context.bot.send_message.assert_awaited_once()
+
+
+async def test_all_providers_down_propagates_error(api, conversation):
+    api(lambda _: httpx.Response(503))
+    with pytest.raises(providers.ProviderError):
+        await handlers.handle_message(*conversation)
+
+
+async def test_unauthorized_user_does_not_search(conversation, monkeypatch):
+    update, context = conversation
+    context.bot.get_chat_member.return_value.status = 'left'
+    search = AsyncMock()
+    monkeypatch.setattr(handlers, 'search_catalog', search)
+    await handlers.handle_message(update, context)
+    search.assert_not_awaited()
+
+
+@pytest.mark.parametrize('failure', [RuntimeError('failed'), ValueError('failed')])
+async def test_selection_does_not_mask_publication_failure(conversation, monkeypatch, failure):
+    update, context = conversation
+    update.message.text = '1'
+    context.user_data['options'] = [{'id': 1, '__type': 'movie'}]
+    monkeypatch.setattr(handlers, 'publish_tmdb_item', AsyncMock(side_effect=failure))
+    with pytest.raises(type(failure), match='failed'):
+        await handlers.select_option(update, context)
+
+
+async def test_multiple_searches_have_no_user_quota(conversation, monkeypatch):
+    search = AsyncMock(return_value=[])
+    monkeypatch.setattr(handlers, 'search_catalog', search)
+    for name in ('search_tvmaze', 'search_omdb', 'search_danfra', 'search_lamparaturca'):
+        monkeypatch.setattr(handlers, name, AsyncMock(return_value=(None, None)))
+    for _ in range(20):
+        await handlers.handle_message(*conversation)
+    assert search.await_count == 20

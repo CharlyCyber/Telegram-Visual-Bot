@@ -48,3 +48,29 @@ def test_synopsis_emoji_count_capped():
     words = " ".join(["amor guerra espacio asesino robot fuego"] * 20)
     out = get_synopsis_with_emojis(words)
     assert out.count("❤️") <= 30
+
+
+def test_long_html_keeps_tags_balanced_and_counts_emojis():
+    from visualbot.formatting import fit_html, utf16_length
+    from bs4 import BeautifulSoup
+    from xml.etree import ElementTree
+    result = fit_html('<b>😀 &amp; ' + 'amor ' * 100 + '</b><i>Final</i>', 24)
+    ElementTree.fromstring('<root>' + result + '</root>')
+    assert utf16_length(BeautifulSoup(result, 'html.parser').get_text()) <= 24
+    assert '…' in result
+
+
+def test_tmdb_caption_retains_signature_when_metadata_is_long():
+    from visualbot.config import FIRME
+    from visualbot.formatting import render_tmdb_caption, utf16_length
+    from bs4 import BeautifulSoup
+    from xml.etree import ElementTree
+    poster, caption = render_tmdb_caption('Tom & Jerry 😀', {
+        'poster_path': '/poster.jpg', 'tagline': 'Amor <aventura> ' * 300,
+        'genres': [{'name': 'Animación'}],
+    }, True, 'En un mundo de aventuras ' * 300)
+    assert poster.endswith('/poster.jpg')
+    assert FIRME in caption
+    assert 'Tom &amp; Jerry' in caption
+    assert utf16_length(BeautifulSoup(caption, 'html.parser').get_text()) <= 1024
+    ElementTree.fromstring('<root>' + caption + '</root>')
