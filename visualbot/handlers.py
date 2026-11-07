@@ -1,11 +1,13 @@
 """Comandos, autorización y conversaciones de Telegram."""
 import logging
+import re
 import httpx
 from telegram import Update
 from telegram.ext import ContextTypes, ConversationHandler
 
 from .config import CHAT_ID, SELECCIONANDO
 from .spam import is_spam_message
+from .web_catalogs import search_official_web, publish_web_item
 from .providers import (search_catalog, search_tvmaze, search_omdb, search_danfra,
                         search_lamparaturca, publish_tmdb_item, ProviderError)
 
@@ -58,7 +60,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         name, year = text.rsplit(' ', 1)
         year = year.strip()
-        if not year.isdigit():
+        if not re.fullmatch(r'(?:19|20)\d{2}', year):
             name = text
             year = None
     except ValueError:
@@ -83,6 +85,19 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 continue
             if caption:
                 break
+        if not caption:
+            web_options = await search_official_web(name, year)
+            if len(web_options) == 1:
+                await publish_web_item(context, web_options[0])
+                return ConversationHandler.END
+            if web_options:
+                context.user_data['options'] = web_options
+                lines = ['Encontré estas fichas oficiales. Responde con el número de la opción:\n']
+                for idx, item in enumerate(web_options, 1):
+                    date = f" ({item['year']})" if item['year'] else ''
+                    lines.append(f"{idx}. {item['title']}{date} · {item['source']}")
+                await update.message.reply_text('\n'.join(lines))
+                return SELECCIONANDO
         if not caption and failures:
             raise ProviderError("No se pudo completar la búsqueda en los proveedores") from failures[-1]
         if not caption:
@@ -144,9 +159,12 @@ async def select_option(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text('Opción inválida. Intenta de nuevo.')
         return SELECCIONANDO
     item = options[idx]
-    is_movie = item.get('__type') == 'movie'
-    year = (item.get('release_date') or item.get('first_air_date') or '')[:4]
-    await publish_tmdb_item(update, context, item, is_movie, year)
+    if item.get('__type') == 'web':
+        await publish_web_item(context, item)
+    else:
+        is_movie = item.get('__type') == 'movie'
+        year = (item.get('release_date') or item.get('first_air_date') or '')[:4]
+        await publish_tmdb_item(update, context, item, is_movie, year)
     context.user_data.clear()
     return ConversationHandler.END
 

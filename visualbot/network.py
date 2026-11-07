@@ -35,6 +35,10 @@ async def initialize_http(application):
 
 
 async def shutdown_http(application):
+    from .web_http import clear_web_state
+    from .web_catalogs import clear_search_cache
+    clear_web_state()
+    clear_search_cache()
     global _client
     if _client is not None:
         await _client.aclose()
