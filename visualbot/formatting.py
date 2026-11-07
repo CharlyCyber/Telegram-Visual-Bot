@@ -1,4 +1,5 @@
 """Formato HTML y vocabulario visual."""
+from .result_labels import identity_fields
 import html
 from bs4 import BeautifulSoup
 from .config import FIRME, SEP, SEP_SOFT, SEP_STAR
@@ -168,7 +169,8 @@ def render_tmdb_caption(title, details, is_movie, overview):
             f"✨ <b>{esc(title)} ({esc(release_date[:4]) if release_date else 'N/D'})</b> ✨",
         ]
         lines.append(SEP)
-        lines.append("🎬 <b>Tipo:</b> Película 🎞️" if is_movie else "📺 <b>Tipo:</b> Serie 📺")
+        for label, value in identity_fields(dict(details, __type='movie' if is_movie else 'tv'), title):
+            lines.append(f"<b>{esc(label)}:</b> {esc(value)}")
         if tagline:
             lines.append(f"💬 <i>«{esc(tagline)}»</i>")
         if ov:
@@ -188,7 +190,7 @@ def render_tmdb_caption(title, details, is_movie, overview):
                 temp_txt += f"  •  🎞️ <b>Episodios:</b> {esc(num_episodes)}"
             lines.append(temp_txt)
         if countries:
-            lines.append(f"🏳️ <b>País:</b> {esc(countries)}")
+            lines.append(f"🏳️ <b>País de producción:</b> {esc(countries)}")
         if is_movie:
             b = fmt_money(budget)
             rev = fmt_money(revenue)

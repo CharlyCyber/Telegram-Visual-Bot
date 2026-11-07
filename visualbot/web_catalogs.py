@@ -11,6 +11,7 @@ from bs4 import BeautifulSoup
 from telegram.error import TelegramError
 
 from .cache import TTLCache
+from .result_labels import identity_fields
 from .config import FIRME, SEP_STAR
 from .formatting import esc, fit_html, get_dynamic_closing, utf16_length
 from .web_http import fetch_html, WebUnavailable
@@ -165,8 +166,21 @@ def metadata(source, html, url, query, year=None):
             continue
         return {'__type': 'web', 'title': title, 'year': released,
                 'description': description[:2000], 'url': url, 'source': source.name,
-                'image': source.image(record.get('image'), url)}
+                'image': source.image(record.get('image'), url),
+                'origin_countries': record.get('countryOfOrigin'),
+                'content_type': _content_type(record),
+                'alternate_names': aliases if isinstance(aliases, list) else []}
     return None
+
+
+
+def _content_type(record):
+    types = record.get('@type', [])
+    types = [types] if isinstance(types, str) else types
+    if not isinstance(types, list):
+        return None
+    types = {value.rsplit('/', 1)[-1] for value in types if isinstance(value, str)}
+    return 'movie' if 'Movie' in types else 'tv' if 'TVSeries' in types else 'show' if 'TVShow' in types else None
 
 
 def deduplicate(items):
@@ -232,7 +246,8 @@ async def publish_web_item(context, item):
     signature = (f"\n🌐 <a href='{esc(item['url'])}'>Ficha oficial · {esc(item['source'])}</a>\n"
                  f'{SEP_STAR}\n{get_dynamic_closing()}{FIRME}')
     title = esc(item['title']) + (f" ({esc(item['year'])})" if item['year'] else '')
-    body = (f'📺 <b>{title}</b>\n\n'
+    identity = '\n'.join(f'<b>{esc(label)}:</b> {esc(value)}' for label, value in identity_fields(item))
+    body = (f'📺 <b>{title}</b>\n{identity}\n\n'
             f"📝 {esc(item['description'])}\n")
     limit = 1024 if item.get('image') else 4096
     caption = fit_html(body, limit - utf16_length(BeautifulSoup(signature, 'html.parser').get_text())) + signature
