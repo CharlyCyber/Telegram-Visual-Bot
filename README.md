@@ -355,3 +355,25 @@ en Lámpara Turca, Telemundo u otra plataforma. Tampoco se transforma cualquier
 serie de Turquía en «telenovela»: hace falta una clasificación explícita (por
 ejemplo, género Soap). Si falta el país, simplemente no se muestra. Esta mejora
 no crea equivalencias automáticas entre títulos: solo muestra los datos recibidos.
+
+## 📺 Temporadas de series y realities
+
+Al seleccionar una serie de TMDb, el bot muestra automáticamente la temporada
+regular más reciente con fecha de estreno válida que ya haya comenzado. No
+selecciona especiales (temporada 0), temporadas futuras ni temporadas sin fecha.
+Si hay varias temporadas, se presenta una lista numerada: responde con el número
+**de la opción** para mostrar otra temporada, `0` para terminar o `/cancel` para
+cancelar. En títulos ambiguos, primero se elige el programa y después la temporada.
+
+Para buscar una temporada por año, escribe por ejemplo `La isla de las tentaciones 2026`. El año filtra el estreno de películas; para series se busca el programa sin
+filtrar su primer estreno y se elige la temporada estrenada en ese año. Si hay
+varias, se usa la más reciente. Si no hay ninguna, se indica claramente que la
+ficha mostrada es general y se permite elegir otras temporadas disponibles.
+
+Los datos de la temporada proceden de TMDb; si no tiene sinopsis de la temporada,
+no se presenta la sinopsis general como si fuera de ella. La ficha distingue los
+recuentos de la temporada de los totales de la serie. Si no se encuentra una
+temporada, se intenta buscar una ficha general en los catálogos oficiales ya
+configurados; no se garantiza que tengan datos de temporadas ni cobertura del
+programa. Telecinco/Mediaset no forma parte actualmente de esos catálogos. La
+actualidad y cobertura de las fichas dependen de las fuentes y sus fechas.

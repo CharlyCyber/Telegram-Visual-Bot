@@ -1,6 +1,7 @@
 """Consultas a proveedores y publicación de sus fichas."""
 import asyncio
 import logging
+from datetime import date
 import httpx
 from bs4 import BeautifulSoup
 from telegram import Update
@@ -152,7 +153,7 @@ async def publish_tmdb_item(update: Update,
                             context,
                             item,
                             is_movie,
-                            year=None):
+                            year=None, *, requested_year=None, season_number=None):
     async with shared_client() as client:
         if is_movie:
             title = item.get('title', 'Sin título')
@@ -171,10 +172,33 @@ async def publish_tmdb_item(update: Update,
         r = await client.get(details_url, params=details_params, timeout=10)
         details = r.json()
 
-        overview = details.get('overview') or ''
+        seasons = aired_seasons(details.get('seasons')) if not is_movie else []
+        selected = None
+        if seasons:
+            candidates = [season for season in seasons
+                          if not requested_year or season['air_date'][:4] == str(requested_year)]
+            if season_number is not None:
+                candidates = [season for season in seasons if season['season_number'] == season_number]
+            if candidates:
+                selected = dict(candidates[0])
+                try:
+                    season_response = await client.get(
+                        f"{details_url}/season/{selected['season_number']}",
+                        params={"api_key": TMDB_API_KEY, "language": "es-ES",
+                                "append_to_response": "credits"}, timeout=10)
+                    season_data = season_response.json()
+                    if isinstance(season_data, dict):
+                        # El resumen aporta número/fecha y sirve si falta algún dato.
+                        selected.update({k: v for k, v in season_data.items()
+                                         if k in ('name', 'overview', 'poster_path', 'credits', 'episode_count')
+                                         and v not in (None, '', [], {})})
+                except (httpx.HTTPError, ValueError, TypeError) as e:
+                    logger.warning("No se pudieron obtener los detalles de la temporada: %s", e)
+
+        overview = (selected.get('overview') or '') if selected else (details.get('overview') or '')
 
         # Fallback: si no hay sinopsis en español, intentar en inglés
-        if not overview:
+        if not overview and not selected:
             try:
                 fallback_params = {
                     "api_key": TMDB_API_KEY,
@@ -190,7 +214,7 @@ async def publish_tmdb_item(update: Update,
                 logger.warning(f"No se pudo obtener fallback en inglés: {e}")
 
         # Fallback 2: si sigue sin sinopsis, buscar en OMDb por IMDb ID
-        if not overview and OMDB_API_KEY:
+        if not overview and not selected and OMDB_API_KEY:
             imdb_id = details.get('imdb_id')
             if imdb_id:
                 try:
@@ -206,7 +230,7 @@ async def publish_tmdb_item(update: Update,
                 except (httpx.HTTPError, ValueError, KeyError, TypeError, AttributeError, IndexError) as e:
                     logger.warning(f"No se pudo obtener sinopsis de OMDb: {e}")
 
-    poster_url, caption = render_tmdb_caption(title, dict(item, **details), is_movie, overview)
+    poster_url, caption = render_tmdb_caption(title, dict(item, **details), is_movie, overview, season=selected)
 
     if poster_url:
         try:
@@ -220,6 +244,30 @@ async def publish_tmdb_item(update: Update,
     else:
         await update.message.reply_text(text=caption,
                                        parse_mode='HTML')
+    return {'seasons': seasons, 'selected': selected['season_number'] if selected else None}
+
+
+def aired_seasons(raw, today=None):
+    """Solo temporadas regulares con fecha válida y ya estrenadas, más reciente primero."""
+    today = today or date.today()
+    result = []
+    seen = set()
+    for season in raw if isinstance(raw, list) else []:
+        if not isinstance(season, dict):
+            continue
+        number, air_date = season.get('season_number'), season.get('air_date')
+        if not isinstance(number, int) or isinstance(number, bool) or number <= 0 or number in seen:
+            continue
+        if not isinstance(air_date, str) or len(air_date) != 10:
+            continue
+        try:
+            released = date.fromisoformat(air_date)
+        except (TypeError, ValueError):
+            continue
+        if released <= today:
+            result.append(season)
+            seen.add(number)
+    return sorted(result, key=lambda s: (s['air_date'], s['season_number']), reverse=True)
 
 
 async def search_danfra(query: str):
@@ -308,7 +356,7 @@ async def search_catalog(query: str, year=None):
         movie_params, tv_params = dict(params), dict(params)
         if year:
             movie_params['year'] = year
-            tv_params['first_air_date_year'] = year
+            # El año de una serie puede referirse a una temporada posterior.
         movie, tv = await asyncio.gather(
             client.get('https://api.themoviedb.org/3/search/movie', params=movie_params),
             client.get('https://api.themoviedb.org/3/search/tv', params=tv_params),

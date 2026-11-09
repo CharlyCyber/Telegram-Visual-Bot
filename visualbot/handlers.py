@@ -5,9 +5,10 @@ import httpx
 from telegram import Update
 from telegram.ext import ContextTypes, ConversationHandler
 
-from .config import CHAT_ID, SELECCIONANDO
+from .config import CHAT_ID, SELECCIONANDO, SELECCIONANDO_TEMPORADA
 from .spam import is_spam_message
-from .result_labels import send_options
+from .result_labels import send_options, one_line
+from .formatting import utf16_length
 from .web_catalogs import search_official_web, publish_web_item
 from .providers import (search_catalog, search_tvmaze, search_omdb, search_danfra,
                         search_lamparaturca, publish_tmdb_item, ProviderError)
@@ -50,6 +51,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return  # Ignorar silenciosamente
 
+    context.user_data.clear()
     text = update.message.text.strip()
 
     # Log de uso legítimo
@@ -102,6 +104,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text(
                 'No se encontró el material en ninguna de nuestras fuentes. Intenta con otro nombre o año.')
             return
+        if year:
+            await update.message.reply_text('No se pudo verificar que esta ficha corresponda al año solicitado.')
         if poster_url:
             await context.bot.send_photo(chat_id=CHAT_ID,
                                          photo=poster_url,
@@ -116,6 +120,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Si hay más de una coincidencia, mostrar opciones
     if len(combined) > 1:
         context.user_data['options'] = combined
+        context.user_data['requested_year'] = year
         await send_options(update.message, combined,
                            'Se encontraron varias coincidencias. Responde con el número de la opción que deseas publicar:')
         logger.info(f"Cambiando a estado SELECCIONANDO para usuario {update.message.from_user.id}")
@@ -123,9 +128,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # Si solo hay una coincidencia, publicar directamente
     item = combined[0]
-    is_movie = item.get('__type') == 'movie'
-    year = (item.get('release_date') or item.get('first_air_date') or '')[:4]
-    await publish_tmdb_item(update, context, item, is_movie, year)
+    return await publish_selection(update, context, item, year)
 
 
 async def select_option(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -149,12 +152,101 @@ async def select_option(update: Update, context: ContextTypes.DEFAULT_TYPE):
     item = options[idx]
     if item.get('__type') == 'web':
         await publish_web_item(context, item)
-    else:
-        is_movie = item.get('__type') == 'movie'
-        year = (item.get('release_date') or item.get('first_air_date') or '')[:4]
-        await publish_tmdb_item(update, context, item, is_movie, year)
+        context.user_data.clear()
+        return ConversationHandler.END
+    requested_year = context.user_data.get('requested_year')
+    return await publish_selection(update, context, item, requested_year)
+
+
+async def publish_selection(update, context, item, requested_year=None):
+    is_movie = item.get('__type') == 'movie'
+    if is_movie:
+        await publish_tmdb_item(update, context, item, True,
+                                (item.get('release_date') or '')[:4])
+        context.user_data.clear()
+        return ConversationHandler.END
+
+    result = await publish_tmdb_item(update, context, item, False,
+                                     requested_year=requested_year)
+    seasons = result['seasons']
+    selected = result['selected']
+    official = []
+    if selected is None:
+        year_note = f' de {requested_year}' if requested_year else ''
+        await update.message.reply_text(
+            f'No hay una temporada estrenada{year_note} disponible en TMDb. '
+            'Se mostró la ficha general, no una ficha de temporada.')
+        # Las fuentes disponibles aportan fichas generales, no necesariamente
+        # temporadas; nunca afirmar que una ficha general es una temporada.
+        title = item.get('name') or item.get('title') or ''
+        official = await search_official_web(title, requested_year)
+    if selected is not None and not requested_year:
+        await update.message.reply_text('Se mostró la temporada estrenada más reciente disponible en TMDb.')
+    if (seasons and (len(seasons) > 1 or selected is None)) or official:
+        context.user_data.clear()
+        context.user_data['season_item'] = item
+        context.user_data['seasons'] = seasons
+        context.user_data['season_official'] = official
+        await send_season_options(update.message, seasons, selected, official)
+        return SELECCIONANDO_TEMPORADA
     context.user_data.clear()
     return ConversationHandler.END
+
+
+async def send_season_options(message, seasons, selected, official=()):
+    text = 'Elige una opción o responde 0 para terminar:\n\n'
+    for index, season in enumerate(seasons, 1):
+        name = one_line(season.get('name'), 100)
+        number = season['season_number']
+        line = f"{index}. Temporada {number} ({season['air_date'][:4]})"
+        if name:
+            line += f' · {name}'
+        if number == selected:
+            line += ' · mostrada'
+        line += '\n'
+        if utf16_length(text + line) > 4096:
+            await message.reply_text(text.rstrip())
+            text = ''
+        text += line
+    for index, entry in enumerate(official, len(seasons) + 1):
+        line = f"{index}. Ficha oficial general: {one_line(entry.get('title'), 150)} · {one_line(entry.get('source'), 60)}\n"
+        if utf16_length(text + line) > 4096:
+            await message.reply_text(text.rstrip())
+            text = ''
+        text += line
+    if text.strip():
+        await message.reply_text(text.rstrip())
+
+
+async def select_season(update, context):
+    if not await is_user_in_group(context, update.message.from_user.id):
+        context.user_data.clear()
+        return ConversationHandler.END
+    try:
+        index = int(update.message.text.strip())
+    except ValueError:
+        await update.message.reply_text('Responde con el número de una opción o 0 para terminar.')
+        return SELECCIONANDO_TEMPORADA
+    if index == 0:
+        context.user_data.clear()
+        await update.message.reply_text('Selección de temporadas terminada.')
+        return ConversationHandler.END
+    seasons = context.user_data.get('seasons', [])
+    item = context.user_data.get('season_item')
+    official = context.user_data.get('season_official', [])
+    if not item or index < 1 or index > len(seasons) + len(official):
+        await update.message.reply_text('Opción inválida. Intenta de nuevo o responde 0 para terminar.')
+        return SELECCIONANDO_TEMPORADA
+    if index > len(seasons):
+        await publish_web_item(context, official[index - len(seasons) - 1])
+        await update.message.reply_text('Puedes elegir otra opción de la lista o responder 0 para terminar.')
+        return SELECCIONANDO_TEMPORADA
+    number = seasons[index - 1]['season_number']
+    result = await publish_tmdb_item(update, context, item, False, season_number=number)
+    if result['selected'] != number:
+        await update.message.reply_text('La temporada ya no está disponible en TMDb; se mostró la ficha general.')
+    await update.message.reply_text('Puedes elegir otra opción de la lista o responder 0 para terminar.')
+    return SELECCIONANDO_TEMPORADA
 
 
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:

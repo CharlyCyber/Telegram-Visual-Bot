@@ -36,7 +36,10 @@ async def test_catalog_year_cache_and_mutation_isolation(api):
     def respond(request):
         params = request.url.params
         is_movie = request.url.path.endswith('movie')
-        assert params['year' if is_movie else 'first_air_date_year'] == '1999'
+        if is_movie:
+            assert params['year'] == '1999'
+        else:
+            assert 'first_air_date_year' not in params
         return httpx.Response(200, json={'results': [{'id': 1}] if is_movie else []})
     requests = api(respond)
     result = await providers.search_catalog('Matrix', '1999')

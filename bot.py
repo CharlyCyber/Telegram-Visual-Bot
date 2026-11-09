@@ -3,11 +3,11 @@ import logging
 
 from telegram.ext import (ApplicationBuilder, CommandHandler, MessageHandler,
                           filters, ConversationHandler)
-from visualbot.config import BOT_TOKEN, TMDB_API_KEY, SELECCIONANDO
+from visualbot.config import BOT_TOKEN, TMDB_API_KEY, SELECCIONANDO, SELECCIONANDO_TEMPORADA
 from visualbot.logging_setup import configure_logging
 from visualbot.network import initialize_http, shutdown_http
 from visualbot.errors import handle_error
-from visualbot.handlers import start, cancel, handle_message, select_option
+from visualbot.handlers import start, cancel, handle_message, select_option, select_season
 from visualbot.health import _start_health_server
 # Compatibilidad con los imports públicos anteriores.
 from visualbot.spam import is_spam_message
@@ -39,7 +39,9 @@ def main() -> None:
         ],
         states={
             SELECCIONANDO:
-            [MessageHandler(filters.Regex(r'^\d+$'), select_option)]
+            [MessageHandler(filters.Regex(r'^\d+$'), select_option)],
+            SELECCIONANDO_TEMPORADA:
+            [MessageHandler(filters.TEXT & ~filters.COMMAND, select_season)]
         },
         fallbacks=[
             CommandHandler('start', start),
