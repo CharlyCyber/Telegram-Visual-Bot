@@ -112,16 +112,19 @@ def get_dynamic_closing(_synopsis=None):
     return "🤖 Automatización creada por Charli AI, ofrecemos servicios generales de IA 🚀✨"
 
 
-def render_tmdb_caption(title, details, is_movie, overview):
-    tagline = details.get('tagline') or ''
+def render_tmdb_caption(title, details, is_movie, overview, season=None):
+    tagline = '' if season else (details.get('tagline') or '')
     genres_raw = details.get('genres') or []
     genres = [g['name'] for g in genres_raw if g and 'name' in g]
     genre_emojis = get_genre_emojis(genres)
     keyword_emojis = get_keyword_emojis(title)
-    poster_path = details.get('poster_path')
+    poster_path = (season or {}).get('poster_path') or details.get('poster_path')
     poster_url = f'https://image.tmdb.org/t/p/original{poster_path}' if poster_path else None
     release_date = details.get('release_date') or details.get(
         'first_air_date') or ''
+
+    if season:
+        release_date = season.get('air_date') or ''
 
     # Datos específicos de series
     num_seasons = details.get('number_of_seasons')
@@ -144,7 +147,7 @@ def render_tmdb_caption(title, details, is_movie, overview):
 
     vote_average = details.get('vote_average')
     vote_count = details.get('vote_count')
-    credits = details.get('credits') or {}
+    credits = (season.get('credits') or {}) if season else (details.get('credits') or {})
     cast_list = credits.get('cast') or []
     cast = ', '.join([c['name'] for c in cast_list[:4] if c and 'name' in c])
     director = ''
@@ -171,6 +174,10 @@ def render_tmdb_caption(title, details, is_movie, overview):
         lines.append(SEP)
         for label, value in identity_fields(dict(details, __type='movie' if is_movie else 'tv'), title):
             lines.append(f"<b>{esc(label)}:</b> {esc(value)}")
+        if season:
+            lines.append(f"📚 <b>Temporada:</b> {esc(season['season_number'])}")
+            if season.get('name'):
+                lines.append(f"🏷️ <b>Nombre:</b> {esc(season['name'])}")
         if tagline:
             lines.append(f"💬 <i>«{esc(tagline)}»</i>")
         lines.append(f"\n📝 <b>Sinopsis:</b>\n{synopsis_html}")
@@ -180,11 +187,16 @@ def render_tmdb_caption(title, details, is_movie, overview):
         if director:
             lines.append(f"🎬 <b>Dirección:</b> {esc(director)}")
         if release_date:
-            lines.append(f"📅 <b>Estreno:</b> {esc(release_date)}")
+            label = "Estreno de temporada" if season else "Estreno"
+            lines.append(f"📅 <b>{label}:</b> {esc(release_date)}")
+        if season and season.get('episode_count') is not None:
+            lines.append(f"🎞️ <b>Episodios de temporada:</b> {esc(season['episode_count'])}")
         if not is_movie and num_seasons:
-            temp_txt = f"📚 <b>Temporadas:</b> {esc(num_seasons)}"
+            seasons_label = "Temporadas de la serie" if season else "Temporadas"
+            episodes_label = "Episodios de la serie" if season else "Episodios"
+            temp_txt = f"📚 <b>{seasons_label}:</b> {esc(num_seasons)}"
             if num_episodes:
-                temp_txt += f"  •  🎞️ <b>Episodios:</b> {esc(num_episodes)}"
+                temp_txt += f"  •  🎞️ <b>{episodes_label}:</b> {esc(num_episodes)}"
             lines.append(temp_txt)
         if countries:
             lines.append(f"🏳️ <b>País de producción:</b> {esc(countries)}")
@@ -198,9 +210,12 @@ def render_tmdb_caption(title, details, is_movie, overview):
         if vote_average:
             stars = rating_stars(vote_average)
             count_txt = f" ({esc(vote_count)} votos)" if vote_count else ""
-            lines.append(f"⭐️ <b>Calificación:</b> {esc(vote_average)}/10 {stars}{count_txt}")
+            rating_label = "Calificación de la serie" if season else "Calificación"
+            lines.append(f"⭐️ <b>{rating_label}:</b> {esc(vote_average)}/10 {stars}{count_txt}")
         if genres:
             lines.append(f"🎞️ <b>Géneros:</b> {esc(', '.join(genres))} {genre_emojis}")
+        if season:
+            lines.append("🌐 <b>Fuente:</b> TMDb")
         lines.append(f"\n{SEP_STAR}")
         lines.append(f"{get_dynamic_closing()}{FIRME}")
         return '\n'.join(lines)

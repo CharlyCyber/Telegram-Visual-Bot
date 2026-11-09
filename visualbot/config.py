@@ -13,6 +13,7 @@ FIRME = "\n\n💻ANDY (el+lin2)🛠️🪛 📍Ave 3️⃣7️⃣ - #️⃣4️�
 
 # Estados de la conversación
 SELECCIONANDO = 11
+SELECCIONANDO_TEMPORADA = 12
 
 # --- Separadores visuales ---
 SEP = "━━━━━━━━━━━━━━━━━━━━━━"
