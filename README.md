@@ -235,8 +235,9 @@ puede no llegar: revisa también los logs del alojamiento.
 
 ## 🌐 Fuentes oficiales adicionales sin API (especialmente novelas)
 
-Las búsquedas existentes conservan su prioridad y su comportamiento. Si TMDb y
-los respaldos actuales no encuentran una ficha, se consulta una capa adicional
+La mayoría de las fuentes oficiales se consultan si TMDb y los respaldos
+actuales no encuentran una ficha. Mediaset se consulta también después de elegir
+una serie de TMDb, para ofrecer su ficha como alternativa. La capa adicional
 que lee **catálogos HTML públicos**, sin claves nuevas, APIs privadas, buscadores
 externos ni navegador automatizado. El JSON-LD que algunas páginas incluyen en
 su propio HTML se usa como metadatos, no como un endpoint de API.
@@ -249,6 +250,7 @@ su propio HTML se usa como metadatos, no como un endpoint de API.
 | [RTVE Play](https://www.rtve.es/play/colecciones/telenovelas/229/) | Novelas, [archivo](https://www.rtve.es/play/colecciones/play-archivo-novelas/275/), series, documentales y programas con ficha propia. |
 | [Globoplay](https://globoplay.globo.com/categorias/novelas/) | Novelas brasileñas, colecciones 2000/2020, series y películas. Metadatos en el idioma original, normalmente portugués. |
 | [Atresplayer](https://www.atresplayer.com/series/) | Series, novelas y programas enlazados en sus catálogos públicos. |
+| [Mediaset Infinity](https://www.mediasetinfinity.es/programas-tv) | Temporada identificable en la portada de programas del catálogo público. |
 
 No se anuncia una cobertura universal: solo se encuentran obras **enlazadas en
 las páginas de catálogo configuradas** y con metadatos recuperables sin ejecutar
@@ -260,14 +262,15 @@ sin año no se presenta como si correspondiera a esa versión.
 
 ### Compatibilidad y uso
 
-- Orden: TMDb → TVmaze → OMDb → Danfra → Lámpara Turca → catálogos oficiales.
-  Un acierto en las fuentes anteriores **no hace peticiones** a las nuevas.
+- Orden: TMDb; si no hay coincidencia, Mediaset → TVmaze → OMDb → Danfra →
+  Lámpara Turca → los demás catálogos oficiales. Al elegir una serie de TMDb
+  también se consulta Mediaset para ofrecer una opción adicional.
 - Una ficha oficial se publica en el grupo configurado; varias coincidencias se
   muestran para elegir con el mismo sistema numérico ya existente. Se eliminan
   duplicados, conservando versiones con años diferentes.
 - Se comprueba el título y se descartan rutas de noticias/capítulos y metadatos
-  editoriales o de episodios. Una ficha sin título pertinente y descripción no
-  se publica. Son filtros conservadores, no una garantía absoluta de identidad.
+  editoriales o de episodios. En los catálogos generales, una ficha sin título
+  pertinente y descripción no se publica. Son filtros conservadores, no una garantía absoluta de identidad.
 - Las fichas incluyen atribución y enlace oficial. Las imágenes se aceptan solo
   de dominios/CDN configurados; si la imagen falla, se envía texto.
 - La disponibilidad del vídeo en un país, una suscripción o los derechos de
@@ -276,10 +279,10 @@ sin año no se presenta como si correspondiera a esa versión.
 
 ### Configuración opcional
 
-Sin `WEB_SOURCES`, se habilitan las seis fuentes. Para seleccionar algunas:
+Sin `WEB_SOURCES`, se habilitan las siete fuentes. Para seleccionar algunas:
 
 ```env
-WEB_SOURCES=telemundo,las_estrellas,caracol,rtve,globoplay,atresplayer
+WEB_SOURCES=telemundo,las_estrellas,caracol,rtve,globoplay,atresplayer,mediaset
 ```
 
 Usa `WEB_SOURCES=none` para desactivar únicamente esta nueva capa y volver al
@@ -375,5 +378,26 @@ no se presenta la sinopsis general como si fuera de ella. La ficha distingue los
 recuentos de la temporada de los totales de la serie. Si no se encuentra una
 temporada, se intenta buscar una ficha general en los catálogos oficiales ya
 configurados; no se garantiza que tengan datos de temporadas ni cobertura del
-programa. Telecinco/Mediaset no forma parte actualmente de esos catálogos. La
-actualidad y cobertura de las fichas dependen de las fuentes y sus fechas.
+programa. La actualidad y cobertura de las fichas dependen de las fuentes y sus fechas.
+
+### Mediaset Infinity
+
+Tras seleccionar un programa en TMDb, se busca también en el catálogo público de
+Mediaset. Si se identifica una temporada en su portada, aparece como opción
+separada, con atribución y enlace oficial. No se mezclan ni comparan como si
+fueran equivalentes los números de temporada de ambas fuentes; el usuario decide
+cuál publicar. Si no hay resultados de TMDb, se intenta Mediaset antes de los
+respaldos genéricos. Una búsqueda con año solo muestra la ficha si ese año se
+identifica explícitamente en la cabecera de la temporada.
+
+La búsqueda requiere un título normalizado exactamente igual, un título de ficha
+con número de temporada y un enlace explícito a esa temporada en la misma ficha.
+No inventa enlaces, años o sinopsis; sin una descripción estructurada de esa
+edición, indica que no está disponible. Solo se consulta la portada enlazada en
+el catálogo, no todas las temporadas ni episodios. Programas con nombres de
+edición diferentes, acceso restringido o HTML dependiente de JavaScript pueden
+no aparecer. La integración usa el mismo control de robots, dominios, caché y
+límites de las fuentes web, con un máximo de 15 segundos por búsqueda de Mediaset.
+Las pruebas son simuladas: hay que verificar el acceso y la estructura real desde
+el servidor de despliegue. Respetar robots no sustituye comprobar las condiciones
+de uso y licencias de Mediaset.

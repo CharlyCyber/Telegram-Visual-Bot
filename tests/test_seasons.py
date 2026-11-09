@@ -12,6 +12,11 @@ from visualbot import handlers, providers
 from visualbot.formatting import utf16_length
 
 
+@pytest.fixture(autouse=True)
+def no_mediaset_for_existing_tests(monkeypatch):
+    monkeypatch.setattr(handlers, "search_mediaset", AsyncMock(return_value=[]))
+
+
 @pytest.fixture
 def conversation():
     message = SimpleNamespace(text='La isla 2025', from_user=SimpleNamespace(id=1),

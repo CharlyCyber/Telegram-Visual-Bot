@@ -10,6 +10,7 @@ from .spam import is_spam_message
 from .result_labels import send_options, one_line
 from .formatting import utf16_length
 from .web_catalogs import search_official_web, publish_web_item
+from .mediaset import search_mediaset
 from .providers import (search_catalog, search_tvmaze, search_omdb, search_danfra,
                         search_lamparaturca, publish_tmdb_item, ProviderError)
 
@@ -78,6 +79,12 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         combined = []
 
     if not combined:
+        # Mediaset se consulta antes de los respaldos genéricos, que no
+        # distinguen la edición solicitada de la ficha general del programa.
+        official_seasons = await search_mediaset(name, year)
+        if official_seasons:
+            await publish_web_item(context, official_seasons[0])
+            return ConversationHandler.END
         failures = [primary_error] if primary_error else []
         poster_url, caption = None, None
         for search in (search_tvmaze, search_omdb, search_danfra, search_lamparaturca):
@@ -170,7 +177,8 @@ async def publish_selection(update, context, item, requested_year=None):
                                      requested_year=requested_year)
     seasons = result['seasons']
     selected = result['selected']
-    official = []
+    title = item.get('name') or item.get('title') or ''
+    official = await search_mediaset(title, requested_year)
     if selected is None:
         year_note = f' de {requested_year}' if requested_year else ''
         await update.message.reply_text(
@@ -178,8 +186,7 @@ async def publish_selection(update, context, item, requested_year=None):
             'Se mostró la ficha general, no una ficha de temporada.')
         # Las fuentes disponibles aportan fichas generales, no necesariamente
         # temporadas; nunca afirmar que una ficha general es una temporada.
-        title = item.get('name') or item.get('title') or ''
-        official = await search_official_web(title, requested_year)
+        official += await search_official_web(title, requested_year)
     if selected is not None and not requested_year:
         await update.message.reply_text('Se mostró la temporada estrenada más reciente disponible en TMDb.')
     if (seasons and (len(seasons) > 1 or selected is None)) or official:
@@ -209,7 +216,12 @@ async def send_season_options(message, seasons, selected, official=()):
             text = ''
         text += line
     for index, entry in enumerate(official, len(seasons) + 1):
-        line = f"{index}. Ficha oficial general: {one_line(entry.get('title'), 150)} · {one_line(entry.get('source'), 60)}\n"
+        if entry.get('season_number'):
+            year = f" ({entry['year']})" if entry.get('year') else ''
+            label = f"Temporada {entry['season_number']}{year}"
+        else:
+            label = 'Ficha oficial general'
+        line = f"{index}. {label}: {one_line(entry.get('title'), 150)} · {one_line(entry.get('source'), 60)}\n"
         if utf16_length(text + line) > 4096:
             await message.reply_text(text.rstrip())
             text = ''
