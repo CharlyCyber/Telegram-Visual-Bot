@@ -247,8 +247,11 @@ async def publish_web_item(context, item):
                  f'{SEP_STAR}\n{get_dynamic_closing()}{FIRME}')
     title = esc(item['title']) + (f" ({esc(item['year'])})" if item['year'] else '')
     identity = '\n'.join(f'<b>{esc(label)}:</b> {esc(value)}' for label, value in identity_fields(item))
-    body = (f'📺 <b>{title}</b>\n{identity}\n\n'
-            f"📝 {esc(item['description'])}\n")
+    season = (f"\n📚 <b>Temporada:</b> {esc(item['season_number'])}"
+              if item.get('season_number') else '')
+    description = esc(item['description']) if item.get('description') else '<i>Sin descripción disponible.</i>'
+    body = (f'📺 <b>{title}</b>\n{identity}{season}\n\n'
+            f"📝 {description}\n")
     limit = 1024 if item.get('image') else 4096
     caption = fit_html(body, limit - utf16_length(BeautifulSoup(signature, 'html.parser').get_text())) + signature
     if item.get('image'):

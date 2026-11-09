@@ -6,6 +6,11 @@ import pytest
 from visualbot import handlers, providers
 
 
+@pytest.fixture(autouse=True)
+def no_mediaset_for_existing_tests(monkeypatch):
+    monkeypatch.setattr(handlers, "search_mediaset", AsyncMock(return_value=[]))
+
+
 @pytest.fixture
 def conversation():
     message = SimpleNamespace(text='Matrix', from_user=SimpleNamespace(id=123),
