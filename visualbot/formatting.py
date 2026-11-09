@@ -163,7 +163,7 @@ def render_tmdb_caption(title, details, is_movie, overview):
         full = max(0, min(5, full))
         return '⭐' * full + '☆' * (5 - full)
 
-    def build_caption(ov):
+    def build_caption(synopsis_html):
         lines = [
             f"🎬🍿 {keyword_emojis} {genre_emojis}",
             f"✨ <b>{esc(title)} ({esc(release_date[:4]) if release_date else 'N/D'})</b> ✨",
@@ -173,10 +173,7 @@ def render_tmdb_caption(title, details, is_movie, overview):
             lines.append(f"<b>{esc(label)}:</b> {esc(value)}")
         if tagline:
             lines.append(f"💬 <i>«{esc(tagline)}»</i>")
-        if ov:
-            lines.append(f"\n📝 <b>Sinopsis:</b>\n{esc(get_synopsis_with_emojis(ov))}")
-        else:
-            lines.append(f"\n📝 <b>Sinopsis:</b>\n<i>Sin descripción disponible.</i>")
+        lines.append(f"\n📝 <b>Sinopsis:</b>\n{synopsis_html}")
         lines.append(f"\n{SEP_SOFT}")
         if cast:
             lines.append(f"🎭 <b>Reparto:</b> {esc(cast)}")
@@ -208,14 +205,22 @@ def render_tmdb_caption(title, details, is_movie, overview):
         lines.append(f"{get_dynamic_closing()}{FIRME}")
         return '\n'.join(lines)
 
-    caption = build_caption(overview)
-
-    # Reservar la firma y recortar texto, nunca cortar etiquetas o entidades HTML.
+    # La sinopsis es la parte variable: reservar primero espacio para todos los
+    # datos de la ficha y la firma, en lugar de cortar la ficha después de ella.
     limit = 1024 if poster_url else 4096
-    signature = f"\n{SEP_STAR}\n{get_dynamic_closing()}{FIRME}"
-    body = caption[:-len(signature)]
-    budget = limit - utf16_length(BeautifulSoup(signature, 'html.parser').get_text())
-    caption = fit_html(body, budget) + signature
+    synopsis = (esc(get_synopsis_with_emojis(overview)) if overview
+                else '<i>Sin descripción disponible.</i>')
+    fixed_caption = build_caption('')
+    fixed_length = utf16_length(BeautifulSoup(fixed_caption, 'html.parser').get_text())
+    if fixed_length <= limit:
+        caption = build_caption(fit_html(synopsis, limit - fixed_length))
+    else:
+        # Si los propios metadatos son extraordinariamente largos, mantener
+        # siempre una salida válida y la firma, incluso sin espacio para ellos.
+        signature = f"\n{SEP_STAR}\n{get_dynamic_closing()}{FIRME}"
+        body = fixed_caption[:-len(signature)]
+        available = limit - utf16_length(BeautifulSoup(signature, 'html.parser').get_text())
+        caption = fit_html(body, available) + signature
 
     return poster_url, caption
 
