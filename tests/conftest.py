@@ -1,7 +1,7 @@
 """Todas las pruebas son offline: una petición externa accidental falla."""
 import httpx
 import pytest
-from visualbot import network, providers
+from visualbot import network, providers, translator
 
 
 @pytest.fixture(autouse=True)
@@ -12,6 +12,7 @@ async def offline_http(monkeypatch):
     monkeypatch.setattr(network, '_client', client)
     for search in (providers.search_tvmaze, providers.search_omdb, providers.search_catalog):
         search.cache_clear()
+    translator.clear_translation_cache()
     yield
     await network.shutdown_http(None)
     await client.aclose()

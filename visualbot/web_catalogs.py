@@ -14,6 +14,7 @@ from .cache import TTLCache
 from .result_labels import identity_fields
 from .config import FIRME, SEP_STAR
 from .formatting import esc, fit_html, get_dynamic_closing, utf16_length
+from .translator import ensure_spanish
 from .web_http import fetch_html, WebUnavailable
 from .web_sources import enabled_sources
 
@@ -249,7 +250,10 @@ async def publish_web_item(context, item):
     identity = '\n'.join(f'<b>{esc(label)}:</b> {esc(value)}' for label, value in identity_fields(item))
     season = (f"\n📚 <b>Temporada:</b> {esc(item['season_number'])}"
               if item.get('season_number') else '')
-    description = esc(item['description']) if item.get('description') else '<i>Sin descripción disponible.</i>'
+    raw_description = item.get('description')
+    if raw_description:
+        raw_description = await ensure_spanish(raw_description)
+    description = esc(raw_description) if raw_description else '<i>Sin descripción disponible.</i>'
     body = (f'📺 <b>{title}</b>\n{identity}{season}\n\n'
             f"📝 {description}\n")
     limit = 1024 if item.get('image') else 4096

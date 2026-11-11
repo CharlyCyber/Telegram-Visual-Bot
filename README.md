@@ -198,7 +198,9 @@ anteriores del bot y deja una sola instancia con ese token. No ejecutes
 
 - `config.py`: configuración de entorno y constantes.
 - `handlers.py`: comandos, membresía y selección de resultados.
-- `providers.py`: TMDb, TVmaze, OMDb y fuentes alternativas.
+- `providers.py`: TMDb, TVmaze, OMDb, Wikipedia/Wikidata y fuentes alternativas.
+- `translator.py`: detección de idioma y traducción automática al español de
+  sinopsis, descripciones y géneros cuando llegan en inglés u otro idioma.
 - `formatting.py` / `spam.py`: presentación y análisis de contenido. Las fichas
   largas se acortan sin romper HTML, contando los emojis en unidades UTF-16.
 - `network.py` / `cache.py`: conexiones HTTP reutilizables y caché TTL/LRU.
@@ -248,7 +250,7 @@ su propio HTML se usa como metadatos, no como un endpoint de API.
 | [Las Estrellas](https://www.lasestrellas.tv/telenovelas) | Telenovelas de su catálogo público. |
 | [Caracol TV](https://www.caracoltv.com/programas) | Novelas, series, entretenimiento y concursos. |
 | [RTVE Play](https://www.rtve.es/play/colecciones/telenovelas/229/) | Novelas, [archivo](https://www.rtve.es/play/colecciones/play-archivo-novelas/275/), series, documentales y programas con ficha propia. |
-| [Globoplay](https://globoplay.globo.com/categorias/novelas/) | Novelas brasileñas, colecciones 2000/2020, series y películas. Metadatos en el idioma original, normalmente portugués. |
+| [Globoplay](https://globoplay.globo.com/categorias/novelas/) | Novelas brasileñas, colecciones 2000/2020, series y películas. Las sinopsis recuperadas en portugués u otro idioma se traducen automáticamente al español. |
 | [Atresplayer](https://www.atresplayer.com/series/) | Series, novelas y programas enlazados en sus catálogos públicos. |
 | [Mediaset Infinity](https://www.mediasetinfinity.es/programas-tv) | Temporada identificable en la portada de programas del catálogo público. |
 
@@ -373,8 +375,7 @@ filtrar su primer estreno y se elige la temporada estrenada en ese año. Si hay
 varias, se usa la más reciente. Si no hay ninguna, se indica claramente que la
 ficha mostrada es general y se permite elegir otras temporadas disponibles.
 
-Los datos de la temporada proceden de TMDb; si no tiene sinopsis de la temporada,
-no se presenta la sinopsis general como si fuera de ella. La ficha distingue los
+Los datos de la temporada proceden de TMDb (priorizando español `es-ES` y variantes `es-*`, y traduciendo al español si solo existen en inglés u otro idioma, en TVmaze o en Wikipedia); si una serie de varias temporadas no tiene sinopsis propia para esa temporada y se usa la descripción general de la serie, se indica explícitamente que corresponde a la serie general y no se presenta como si fuera de la temporada. La ficha distingue los
 recuentos de la temporada de los totales de la serie. Si no se encuentra una
 temporada, se intenta buscar una ficha general en los catálogos oficiales ya
 configurados; no se garantiza que tengan datos de temporadas ni cobertura del
