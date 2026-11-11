@@ -1,5 +1,6 @@
 """Formato HTML y vocabulario visual."""
 from .result_labels import identity_fields
+from .translator import translate_genre
 import html
 from bs4 import BeautifulSoup
 from .config import FIRME, SEP, SEP_SOFT, SEP_STAR
@@ -29,6 +30,19 @@ genero_emojis_dict = {
     'Deportes': '🏅',
     'Aviación': '✈️',
     'Superhéroes': '🦸',
+    'Acción y Aventura': '🔥',
+    'Ciencia ficción y Fantasía': '🤖',
+    'Telenovela': '📺',
+    'Infantil': '🧸',
+    'Guerra y Política': '⚔️',
+    'Biografía': '📖',
+    'Reality': '📺',
+    'Programa de entrevistas': '🎙️',
+    'Noticias': '📰',
+    'Concurso': '🎯',
+    'Cortometraje': '🎞️',
+    'Cine negro': '🕵️‍♂️',
+    'Sobrenatural': '🔮',
 }
 
 title_keyword_emojis = {
@@ -112,10 +126,10 @@ def get_dynamic_closing(_synopsis=None):
     return "🤖 Automatización creada por Charli AI, ofrecemos servicios generales de IA 🚀✨"
 
 
-def render_tmdb_caption(title, details, is_movie, overview, season=None):
+def render_tmdb_caption(title, details, is_movie, overview, season=None, overview_note=None):
     tagline = '' if season else (details.get('tagline') or '')
     genres_raw = details.get('genres') or []
-    genres = [g['name'] for g in genres_raw if g and 'name' in g]
+    genres = [translate_genre(g['name']) for g in genres_raw if g and g.get('name')]
     genre_emojis = get_genre_emojis(genres)
     keyword_emojis = get_keyword_emojis(title)
     poster_path = (season or {}).get('poster_path') or details.get('poster_path')
@@ -223,8 +237,11 @@ def render_tmdb_caption(title, details, is_movie, overview, season=None):
     # La sinopsis es la parte variable: reservar primero espacio para todos los
     # datos de la ficha y la firma, en lugar de cortar la ficha después de ella.
     limit = 1024 if poster_url else 4096
-    synopsis = (esc(get_synopsis_with_emojis(overview)) if overview
-                else '<i>Sin descripción disponible.</i>')
+    if overview:
+        synopsis_body = esc(get_synopsis_with_emojis(overview))
+        synopsis = f"<i>{esc(overview_note)}</i>\n{synopsis_body}" if overview_note else synopsis_body
+    else:
+        synopsis = '<i>Sin descripción disponible.</i>'
     fixed_caption = build_caption('')
     fixed_length = utf16_length(BeautifulSoup(fixed_caption, 'html.parser').get_text())
     if fixed_length <= limit:

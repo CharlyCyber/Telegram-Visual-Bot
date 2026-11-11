@@ -88,10 +88,24 @@ def season_metadata(html, url, query):
             node_name = str(node.get('name') or '').split('|', 1)[0].strip()
             kind = node.get('@type', '')
             types = [kind] if isinstance(kind, str) else kind if isinstance(kind, list) else []
-            if (any(isinstance(t, str) and t.rsplit('/', 1)[-1] in ('TVSeries', 'TVSeason') for t in types)
-                    and normalize(node_name) == normalize(name) and isinstance(node.get('description'), str)):
+            type_names = {t.rsplit('/', 1)[-1] for t in types if isinstance(t, str)}
+            if not isinstance(node.get('description'), str):
+                continue
+            matches_series_name = (
+                bool(type_names & {'TVSeries', 'TVSeason'})
+                and normalize(node_name) == normalize(name)
+            )
+            matches_season_num = (
+                'TVSeason' in type_names
+                and str(node.get('seasonNumber', '')).strip() == str(number)
+            )
+            if matches_series_name or matches_season_num:
                 description = BeautifulSoup(node['description'], 'html.parser').get_text(' ', strip=True)[:2000]
                 break
+        if not description and og and normalize(og.get('content', '').split('|', 1)[0].strip()) == normalize(name):
+            og_desc = soup.find('meta', property='og:description') or soup.find('meta', attrs={'name': 'description'})
+            if og_desc and og_desc.get('content'):
+                description = BeautifulSoup(og_desc['content'], 'html.parser').get_text(' ', strip=True)[:2000]
         image = None
         for img in soup.select('img[alt]'):
             if normalize(img.get('alt', '')) == normalize(name):
