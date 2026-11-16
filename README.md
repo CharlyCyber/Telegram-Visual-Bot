@@ -1,4 +1,22 @@
 <div align="center">
+  <a href="https://unsplash.com/photos/empty-red-cinema-seats-with-projector-beam-eg3kfOaN3U4">
+    <img src="https://images.unsplash.com/photo-1774619755413-7c31ab3aabc3?auto=format&fit=crop&crop=entropy&w=1800&h=520&q=85&sat=-85&brightness=-10" alt="Sala de cine oscura con proyector para Telegram Visual Bot" width="100%" />
+  </a>
+</div>
+
+<p align="center">
+  <a href="https://github.com/CharlyCyber/Telegram-Visual-Bot"><img src="https://img.shields.io/github/actions/workflow/status/CharlyCyber/Telegram-Visual-Bot/tests.yml?branch=main&style=for-the-badge&label=Tests&color=C7F36A&labelColor=111418" alt="Tests" /></a>
+  <a href="https://github.com/CharlyCyber/Telegram-Visual-Bot"><img src="https://img.shields.io/github/stars/CharlyCyber/Telegram-Visual-Bot?style=for-the-badge&color=C7F36A&labelColor=111418" alt="Stars" /></a>
+  <a href="https://github.com/CharlyCyber/Telegram-Visual-Bot"><img src="https://img.shields.io/github/languages/top/CharlyCyber/Telegram-Visual-Bot?style=for-the-badge&color=C7F36A&labelColor=111418" alt="Language" /></a>
+</p>
+
+<p align="center">
+  <sub>Imagen de portada: <a href="https://unsplash.com/photos/empty-red-cinema-seats-with-projector-beam-eg3kfOaN3U4">Andrii Solok / Unsplash</a> · Licencia Unsplash</sub>
+</p>
+
+<hr />
+
+<div align="center">
   <img src="assets/readme-banner.svg" alt="" width="100%" />
   <h1>🤖 Bot de Telegram Anti-Spam para Películas y Series</h1>
   <p>
