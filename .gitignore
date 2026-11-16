@@ -1,4 +1,6 @@
 .env
+.env.*
+!.env.example
 __pycache__/
 *.pyc
 logs/
@@ -7,3 +9,5 @@ run/
 tests/__pycache__/
 .venv/
 .pytest_cache/
+*.pem
+*.key
