@@ -66,6 +66,7 @@ def test_missing_credentials_exit_with_error(monkeypatch):
 def test_polling_retries_and_cleans_up(monkeypatch, polling_error):
     monkeypatch.setattr(bot, 'BOT_TOKEN', 'test-token')
     monkeypatch.setattr(bot, 'TMDB_API_KEY', 'test-key')
+    monkeypatch.setattr(bot, 'CHAT_ID', -1001234567890)
     app = Mock()
     builder = Mock()
     builder.token.return_value.post_init.return_value.post_shutdown.return_value.build.return_value = app
