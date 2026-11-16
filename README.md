@@ -1,4 +1,14 @@
-# 🤖 Bot de Telegram Anti-Spam para Películas y Series
+<div align="center">
+  <img src="assets/readme-banner.svg" alt="" width="100%" />
+  <h1>🤖 Bot de Telegram Anti-Spam para Películas y Series</h1>
+  <p>
+  <a href="https://github.com/CharlyCyber/Telegram-Visual-Bot/actions/workflows/tests.yml"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/CharlyCyber/Telegram-Visual-Bot/tests.yml?branch=main&amp;style=flat-square&amp;label=CI&amp;color=a8f01c&amp;labelColor=171c13" /></a>
+  <img alt="Top language" src="https://img.shields.io/github/languages/top/CharlyCyber/Telegram-Visual-Bot?style=flat-square&amp;color=a8f01c&amp;labelColor=171c13" />
+  <img alt="Stars" src="https://img.shields.io/github/stars/CharlyCyber/Telegram-Visual-Bot?style=flat-square&amp;color=a8f01c&amp;labelColor=171c13" />
+  <img alt="Last commit" src="https://img.shields.io/github/last-commit/CharlyCyber/Telegram-Visual-Bot?style=flat-square&amp;color=a8f01c&amp;labelColor=171c13" />
+  </p>
+</div>
+
 
 Bot inteligente de Telegram que busca y publica información de películas y series con **sistema anti-spam avanzado**.
 
