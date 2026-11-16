@@ -7,9 +7,9 @@ load_dotenv()
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 TMDB_API_KEY = os.getenv("TMDB_API_KEY")
 OMDB_API_KEY = os.getenv("OMDB_API_KEY")
-CHAT_ID = int(os.getenv("GROUP_CHAT_ID", "-1002700094661"))
+CHAT_ID = int(os.environ["GROUP_CHAT_ID"]) if os.getenv("GROUP_CHAT_ID") else None
 
-FIRME = "\n\n💻ANDY (el+lin2)🛠️🪛 📍Ave 3️⃣7️⃣ - #️⃣4️⃣2️⃣1️⃣1️⃣ ➗4️⃣2️⃣ y 4️⃣8️⃣ cerca del CVD 🏟️ 📌MAYABEQUE SAN JOSÉ"
+FIRME = "\n\n🌐 charli-ai-portfolio.vercel.app"
 
 # Estados de la conversación
 SELECCIONANDO = 11
