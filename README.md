@@ -166,10 +166,12 @@ en GitHub que requiera estos checks; el workflow por sí solo no bloquea merges.
 - ❌ `"🚨 FREE ETH ALERT! 🚨"` → Detectado como spam
 - ✅ `"Matrix"` → Búsqueda legítima
 
-## 👨‍💻 Desarrollado por ANDY
+## 👨‍💻 Autor
 
-Bot personalizado con firma:
-> 💻ANDY (el+lin2)🛠️🪛 📍Ave 3️⃣7️⃣ - #️⃣4️⃣2️⃣1️⃣1️⃣ ➗4️⃣2️⃣ y 4️⃣8️⃣ cerca del CVD 🏟️ 📌MAYABEQUE SAN JOSÉ
+Desarrollado por **Charli Rodríguez — Charli AI**.
+
+- Portafolio: https://charli-ai-portfolio.vercel.app
+- GitHub: https://github.com/CharlyCyber
 
 ## 🆘 Solución de Problemas
 

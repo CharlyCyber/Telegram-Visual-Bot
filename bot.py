@@ -3,7 +3,7 @@ import logging
 
 from telegram.ext import (ApplicationBuilder, CommandHandler, MessageHandler,
                           filters, ConversationHandler)
-from visualbot.config import BOT_TOKEN, TMDB_API_KEY, SELECCIONANDO, SELECCIONANDO_TEMPORADA
+from visualbot.config import BOT_TOKEN, TMDB_API_KEY, CHAT_ID, SELECCIONANDO, SELECCIONANDO_TEMPORADA
 from visualbot.logging_setup import configure_logging
 from visualbot.network import initialize_http, shutdown_http
 from visualbot.errors import handle_error
@@ -22,9 +22,9 @@ logger = logging.getLogger(__name__)
 
 def main() -> None:
     """Inicia el bot."""
-    if not all([BOT_TOKEN, TMDB_API_KEY]):
+    if not all([BOT_TOKEN, TMDB_API_KEY, CHAT_ID]):
         logger.critical(
-            "Faltan variables de entorno críticas (BOT_TOKEN, TMDB_API_KEY). El bot no puede iniciar."
+            "Faltan variables de entorno críticas (BOT_TOKEN, TMDB_API_KEY, GROUP_CHAT_ID). El bot no puede iniciar."
         )
         raise SystemExit(1)
 
