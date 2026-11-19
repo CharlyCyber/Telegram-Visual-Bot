@@ -45,29 +45,25 @@ OMDB_API_KEY=tu_omdb_api_key_aqui
 GROUP_CHAT_ID=-1001234567890
 ```
 
-### Disponibilidad 24/7: evitar la suspensión
+### Disponibilidad 24/7: Hugging Face Spaces, Render Free o VPS
 
-**El código no puede impedir que el proveedor suspenda una instancia gratuita.**
-Para mantener el bot activo sin tráfico, usa un servicio de pago que no se
-suspenda por inactividad o un VPS siempre encendido. Los auto-pings no son una
-garantía de disponibilidad. Tampoco existe garantía absoluta frente a caídas
-del proveedor, de la red o de Telegram.
+Consulta la guía paso a paso en **[DEPLOY_24_7_GRATIS.md](DEPLOY_24_7_GRATIS.md)** para mantener el bot despierto gratis 24/7 usando **Hugging Face Spaces (Docker)** o **Render Free** junto a **cron-job.org** (y el workflow `.github/workflows/keep_alive.yml`).
 
-### Deploy en Render (siempre activo)
+> Nota: los planes gratuitos dependen de sus políticas externas y de recibir tráfico periódico en `/health` (ej. `cron-job.org` cada 10 minutos). Si buscas SLA sin depender de pings externos, usa un plan de pago o un VPS siempre encendido.
 
-El archivo `render.yaml` define un servicio web con **plan Starter (de pago)**,
-una sola instancia y comprobación de salud en `/health`.
+### Deploy en Render (`render.yaml`)
 
-1. En Render, crea un **Blueprint** y conecta este repositorio y la rama que
-   contenga estos cambios.
-2. Revisa y acepta el costo del plan Starter antes de crear el servicio.
-3. Introduce las variables de entorno en Render; no subas secretos al repositorio.
+El archivo `render.yaml` define un servicio web con **plan Free**, una sola instancia, inicio mediante `./start.sh` y comprobación de salud en `/health`.
+
+1. En Render, crea un **Blueprint** y conecta este repositorio.
+2. Introduce las variables de entorno en Render; no subas secretos al repositorio.
    `BOT_TOKEN` y `TMDB_API_KEY` son obligatorias para arrancar; configura también
    `OMDB_API_KEY` y el `GROUP_CHAT_ID` de tu grupo.
-4. Despliega y comprueba los logs y `https://<tu-servicio>.onrender.com/health`.
+3. Despliega y comprueba los logs y `https://<tu-servicio>.onrender.com/health`.
+4. Si usas el plan gratuito, configura un monitor en `cron-job.org` cada 10 minutos hacia `/health` (ver [DEPLOY_24_7_GRATIS.md](DEPLOY_24_7_GRATIS.md)).
 
 **Si el servicio ya existe**, añadir el Blueprint al repositorio no modifica por
-sí solo el servicio actual. Cambia su instancia a Starter o superior y configura:
+sí solo el servicio actual. Comprueba su configuración:
 
 - Build command: `pip install -r requirements.txt`
 - Start command: `./start.sh`
@@ -77,8 +73,7 @@ sí solo el servicio actual. Cambia su instancia a Starter o superior y configur
 El arranque usa Supervisor para reiniciar el bot cuando termina, incluso si
 falla inmediatamente. Telegram se reconecta también durante el arranque si hay
 fallos transitorios. `/health` devuelve **200** cuando la aplicación y el polling
-están en marcha, o **503** mientras no estén listos; no verifica las APIs de
-películas ni garantiza conectividad instantánea con Telegram.
+están en marcha, o **503** mientras no estén listos, mientras que `/` devuelve **200** con estado JSON (compatible con Hugging Face Spaces).
 
 No ejecutes el mismo token en otro servidor al mismo tiempo: Telegram permite
 un solo consumidor de long polling. Durante un despliegue puede haber un breve

@@ -1,9 +1,10 @@
-# El plan Starter es de pago: los servicios gratuitos pueden suspenderse.
+# Despliegue en Render Free con healthcheck en /health.
+# Para evitar que Render Free se duerma tras 15 min sin tráfico, sigue DEPLOY_24_7_GRATIS.md (cron-job.org).
 services:
   - type: web
     name: telegram-visual-bot
     runtime: python
-    plan: starter
+    plan: free
     numInstances: 1
     buildCommand: pip install -r requirements.txt
     startCommand: ./start.sh
@@ -20,4 +21,8 @@ services:
       - key: OMDB_API_KEY
         sync: false
       - key: GROUP_CHAT_ID
+        sync: false
+      - key: ADMIN_CHAT_ID
+        sync: false
+      - key: PUBLIC_URL
         sync: false

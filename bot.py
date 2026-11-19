@@ -8,7 +8,7 @@ from visualbot.logging_setup import configure_logging
 from visualbot.network import initialize_http, shutdown_http
 from visualbot.errors import handle_error
 from visualbot.handlers import start, cancel, handle_message, select_option, select_season
-from visualbot.health import _start_health_server
+from visualbot.health import _start_health_server, _start_self_ping
 # Compatibilidad con los imports públicos anteriores.
 from visualbot.spam import is_spam_message
 from visualbot.formatting import (esc, get_genre_emojis, get_keyword_emojis,
@@ -51,11 +51,16 @@ def main() -> None:
     app.add_handler(conv_handler)
 
     server, health_thread = _start_health_server(app)
+    ping_stop, ping_thread = _start_self_ping(server.server_port)
     try:
         logger.info("Iniciando bot con reconexión automática...")
         # Reintentar también durante el arranque si Telegram no está disponible.
         app.run_polling(bootstrap_retries=-1)
     finally:
+        if ping_stop is not None:
+            ping_stop.set()
+        if ping_thread is not None:
+            ping_thread.join(timeout=2)
         server.shutdown()
         server.server_close()
         health_thread.join(timeout=5)
